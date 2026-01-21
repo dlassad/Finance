@@ -54,7 +54,6 @@ const App: React.FC = () => {
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Carregar dados iniciais do MongoDB
   const fetchData = useCallback(async () => {
     if (!currentUser) return;
     setIsLoadingData(true);
@@ -63,7 +62,7 @@ const App: React.FC = () => {
         headers: { 'x-user-id': currentUser.id }
       });
       
-      if (!response.ok) throw new Error('Falha ao conectar com MongoDB');
+      if (!response.ok) throw new Error('Falha ao buscar dados');
       
       const data = await response.json();
       
@@ -85,13 +84,12 @@ const App: React.FC = () => {
         setCategories(DEFAULT_CATEGORIES);
       }
     } catch (err) {
-      console.error("Erro ao carregar dados:", err);
+      console.error("Erro MongoDB:", err);
     } finally {
       setIsLoadingData(false);
     }
   }, [currentUser]);
 
-  // Sincronizar alterações com MongoDB
   const syncData = useCallback(async () => {
     if (!currentUser || isLoadingData) return;
     setIsSyncing(true);
@@ -108,7 +106,7 @@ const App: React.FC = () => {
         })
       });
     } catch (err) {
-      console.error("Erro ao sincronizar:", err);
+      console.error("Erro Sync:", err);
     } finally {
       setIsSyncing(false);
     }
@@ -118,7 +116,6 @@ const App: React.FC = () => {
     if (currentUser) fetchData();
   }, [fetchData, currentUser]);
 
-  // Debounce para evitar múltiplas chamadas seguidas à API
   useEffect(() => {
     if (isLoadingData || !currentUser) return;
     const timer = setTimeout(() => {
