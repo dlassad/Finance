@@ -99,7 +99,7 @@ const App: React.FC = () => {
     [currentMonthProjections, projectionMonths]
   );
 
-  const currentSummary = currentMonthProjections[0];
+  const currentSummary = currentMonthProjections[0] || { income: 0, expense: 0, balance: 0 };
 
   const creditCardsOnly = useMemo(() => 
     paymentMethods.filter(pm => pm.isCreditCard).map(pm => pm.name),
