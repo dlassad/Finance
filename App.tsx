@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   TrendingUp, 
@@ -34,8 +33,13 @@ import { AuthScreen } from './components/AuthScreen';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('financeview_session');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('financeview_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Erro ao carregar sessão:", e);
+      return null;
+    }
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -85,6 +89,8 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Erro MongoDB:", err);
+      // Fallback para dados locais ou iniciais em caso de erro na API
+      if (transactions.length === 0) setTransactions(INITIAL_TRANSACTIONS);
     } finally {
       setIsLoadingData(false);
     }
