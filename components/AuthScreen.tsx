@@ -32,7 +32,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
     try {
       if (!isLogin && !pwdValidation.isValid) {
-        throw new Error('A senha não atende aos requisitos mínimos.');
+        throw new Error('A senha não atende aos requisitos mínimos de segurança.');
       }
 
       const response = await fetch('/api/auth', {
@@ -40,8 +40,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: isLogin ? 'login' : 'register',
-          email,
-          password: password.trim(),
+          email: email.toLowerCase().trim(),
+          password,
           name: name.trim()
         })
       });
@@ -49,12 +49,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro de conexão com o servidor.');
+        throw new Error(data.error || 'Erro na autenticação. Verifique suas credenciais.');
       }
 
       onLogin(data);
     } catch (err: any) {
-      setError(err.message === 'Failed to fetch' ? 'Erro de conexão: Verifique a MONGODB_URI no Vercel.' : err.message);
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +69,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               <Wallet size={32} />
             </div>
             <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">FinanceView</h1>
-            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">Nuvem MongoDB Atlas</p>
+            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">Conectado ao MongoDB Cloud</p>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-5">
@@ -78,7 +78,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="text"
-                  placeholder="Nome Completo"
+                  placeholder="Seu Nome Completo"
                   className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold text-sm"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -91,7 +91,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="email"
-                placeholder="Seu E-mail"
+                placeholder="E-mail de acesso"
                 className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold text-sm"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -103,7 +103,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="Sua Senha"
+                placeholder="Senha"
                 className="w-full pl-12 pr-12 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold text-sm"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -120,26 +120,32 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
             {!isLogin && password.length > 0 && (
               <div className="bg-gray-50 p-4 rounded-2xl space-y-2 border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Segurança:</p>
-                <div className="flex items-center gap-2 text-[10px] font-bold">
-                  {pwdValidation.hasMinLength ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
-                  <span className={pwdValidation.hasMinLength ? 'text-green-600' : 'text-gray-400'}>8+ carac.</span>
-                  {pwdValidation.hasUpper ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
-                  <span className={pwdValidation.hasUpper ? 'text-green-600' : 'text-gray-400'}>Maiúscula</span>
-                  {pwdValidation.hasSpecial ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
-                  <span className={pwdValidation.hasSpecial ? 'text-green-600' : 'text-gray-400'}>Especial</span>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Requisitos de Segurança:</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                    {pwdValidation.hasMinLength ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
+                    <span className={pwdValidation.hasMinLength ? 'text-green-600' : 'text-gray-400'}>8+ dígitos</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                    {pwdValidation.hasUpper ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
+                    <span className={pwdValidation.hasUpper ? 'text-green-600' : 'text-gray-400'}>Maiúscula</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                    {pwdValidation.hasSpecial ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
+                    <span className={pwdValidation.hasSpecial ? 'text-green-600' : 'text-gray-400'}>Especial (!@#)</span>
+                  </div>
                 </div>
               </div>
             )}
 
-            {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-black text-center uppercase border border-red-100">{error}</div>}
+            {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[11px] font-black text-center uppercase border border-red-100">{error}</div>}
 
             <button
               type="submit"
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs disabled:opacity-50"
             >
-              {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Entrar no Sistema' : 'Criar minha Conta')}
+              {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Acessar FinanceView' : 'Criar minha Conta')}
               {!isLoading && <ArrowRight size={18} />}
             </button>
           </form>
@@ -149,7 +155,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
               className="text-gray-400 hover:text-blue-600 text-[10px] font-black uppercase tracking-widest transition-colors"
             >
-              {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
+              {isLogin ? 'Não tem uma conta? Cadastre-se' : 'Já possui conta? Faça o Login'}
             </button>
           </div>
         </div>

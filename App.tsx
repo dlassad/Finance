@@ -54,6 +54,7 @@ const App: React.FC = () => {
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Carregar dados iniciais do MongoDB
   const fetchData = useCallback(async () => {
     if (!currentUser) return;
     setIsLoadingData(true);
@@ -62,7 +63,7 @@ const App: React.FC = () => {
         headers: { 'x-user-id': currentUser.id }
       });
       
-      if (!response.ok) throw new Error('Falha ao buscar dados');
+      if (!response.ok) throw new Error('Falha ao conectar com MongoDB');
       
       const data = await response.json();
       
@@ -84,12 +85,13 @@ const App: React.FC = () => {
         setCategories(DEFAULT_CATEGORIES);
       }
     } catch (err) {
-      console.error("Erro MongoDB:", err);
+      console.error("Erro ao carregar dados:", err);
     } finally {
       setIsLoadingData(false);
     }
   }, [currentUser]);
 
+  // Sincronizar alterações com MongoDB
   const syncData = useCallback(async () => {
     if (!currentUser || isLoadingData) return;
     setIsSyncing(true);
@@ -106,7 +108,7 @@ const App: React.FC = () => {
         })
       });
     } catch (err) {
-      console.error("Erro Sync:", err);
+      console.error("Erro ao sincronizar:", err);
     } finally {
       setIsSyncing(false);
     }
@@ -116,6 +118,7 @@ const App: React.FC = () => {
     if (currentUser) fetchData();
   }, [fetchData, currentUser]);
 
+  // Debounce para evitar múltiplas chamadas seguidas à API
   useEffect(() => {
     if (isLoadingData || !currentUser) return;
     const timer = setTimeout(() => {
@@ -251,7 +254,7 @@ const App: React.FC = () => {
             
             <div className="flex items-center justify-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
               {isSyncing ? <Loader2 size={10} className="animate-spin text-blue-500" /> : <RefreshCw size={10} />}
-              {isSyncing ? "Salvando..." : "Sincronizado"}
+              {isSyncing ? "Sincronizando..." : "Nuvem Atualizada"}
             </div>
         </div>
       </aside>
@@ -284,13 +287,13 @@ const App: React.FC = () => {
                 <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-gray-800">Meus Lançamentos</h3>
                   <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                    MongoDB Cloud Protected
+                    Sincronizado via MongoDB Cloud
                   </div>
                 </div>
                 {isLoadingData ? (
                   <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
                     <Loader2 size={40} className="animate-spin text-blue-600" />
-                    <p className="font-black text-xs uppercase tracking-widest">Carregando seus dados...</p>
+                    <p className="font-black text-xs uppercase tracking-widest">Acessando seus dados na nuvem...</p>
                   </div>
                 ) : (
                   <TransactionTable 
