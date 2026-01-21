@@ -1,0 +1,55 @@
+
+export enum EntryType {
+  INCOME = 'INCOME',
+  EXPENSE = 'EXPENSE'
+}
+
+export interface PaymentMethod {
+  name: string;
+  isCreditCard: boolean;
+}
+
+export interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: EntryType;
+  category: string;
+  subcategory: string;
+  cardSuffix?: string; 
+  date: string;
+  billingDate?: string; // Formato YYYY-MM para controle de fatura
+  installments?: {
+    current: number;
+    total: number;
+  };
+  isRecurring: boolean;
+  overrides?: Record<string, number>; // Chave: Mês formatado (ex: "JAN. DE 2026"), Valor: número
+  color?: string; // Classe de fundo Tailwind
+  fontColor?: string; // Classe de cor de texto Tailwind
+  reconciled?: boolean;
+}
+
+export interface MonthlySummary {
+  month: string;
+  income: number;
+  expense: number;
+  balance: number;
+  prevBalance: number;
+  [key: string]: string | number | undefined;
+}
+
+export interface CardGroup {
+  suffix: string;
+  total: number;
+  transactions: Transaction[];
+}
+
+export interface CategorySummary {
+  name: string;
+  value: number;
+  color: string;
+  [key: string]: string | number | undefined;
+}
+
+export type CategoryStructure = Record<string, string[]>;
