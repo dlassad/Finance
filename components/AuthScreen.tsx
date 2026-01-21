@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import { Wallet, Mail, Lock, User as UserIcon, ArrowRight, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { User } from '../types';
+import { dataService } from '../services/dataService';
 
 interface AuthScreenProps {
   onLogin: (user: User) => void;
@@ -35,27 +35,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         throw new Error('A senha deve ter pelo menos 8 caracteres, uma letra maiúscula e um caractere especial.');
       }
 
-      const response = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: isLogin ? 'login' : 'register',
-          email: email.toLowerCase().trim(),
-          password,
-          name: name.trim()
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro na autenticação. Verifique os dados e tente novamente.');
+      let user: User;
+      if (isLogin) {
+        user = await dataService.login(email.toLowerCase().trim(), password);
+      } else {
+        user = await dataService.register(email.toLowerCase().trim(), password, name.trim());
       }
+      onLogin(user);
 
-      onLogin(data);
     } catch (err: any) {
       console.error("Auth Error:", err);
-      setError(err.message === 'Failed to fetch' ? 'Erro de conexão com o servidor.' : err.message);
+      setError(err.message || 'Erro na autenticação. Verifique os dados e tente novamente.');
     } finally {
       setIsLoading(false);
     }
