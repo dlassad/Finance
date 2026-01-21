@@ -5,14 +5,14 @@ const uri = process.env.MONGODB_URI || "";
 const options = {};
 
 if (!uri) {
-  console.error("ERRO: MONGODB_URI não definida nas variáveis de ambiente!");
+  throw new Error('Por favor, defina a variável de ambiente MONGODB_URI');
 }
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === 'development') {
-  // Use globalThis instead of global to fix "Cannot find name 'global'" error
+  // Use globalThis instead of global to ensure cross-platform compatibility and fix TypeScript errors
   let globalWithMongo = globalThis as typeof globalThis & {
     _mongoClientPromise?: Promise<MongoClient>;
   };
