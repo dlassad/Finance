@@ -62,6 +62,9 @@ const App: React.FC = () => {
       const response = await fetch('/api/transactions', {
         headers: { 'x-user-id': currentUser.id }
       });
+      
+      if (!response.ok) throw new Error('Falha ao buscar dados');
+      
       const data = await response.json();
       
       if (data.transactions && data.transactions.length > 0) {
@@ -70,7 +73,7 @@ const App: React.FC = () => {
         setTransactions(INITIAL_TRANSACTIONS);
       }
 
-      if (data.settings) {
+      if (data.settings && data.settings.paymentMethods) {
         setPaymentMethods(data.settings.paymentMethods);
         setCategories(data.settings.categories);
       } else {
@@ -82,7 +85,7 @@ const App: React.FC = () => {
         setCategories(DEFAULT_CATEGORIES);
       }
     } catch (err) {
-      console.error("Erro ao buscar dados do MongoDB:", err);
+      console.error("Erro MongoDB:", err);
     } finally {
       setIsLoadingData(false);
     }
@@ -105,23 +108,24 @@ const App: React.FC = () => {
         })
       });
     } catch (err) {
-      console.error("Erro ao sincronizar com MongoDB:", err);
+      console.error("Erro Sync:", err);
     } finally {
       setIsSyncing(false);
     }
   }, [currentUser, transactions, paymentMethods, categories, isLoadingData]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (currentUser) fetchData();
+  }, [fetchData, currentUser]);
 
-  // Debounce sync quando houver mudanças
+  // Debounce sync quando houver mudanças (não sincroniza se estiver carregando inicialmente)
   useEffect(() => {
+    if (isLoadingData || !currentUser) return;
     const timer = setTimeout(() => {
-      if (transactions.length > 0) syncData();
-    }, 2000);
+      syncData();
+    }, 1500);
     return () => clearTimeout(timer);
-  }, [transactions, paymentMethods, categories, syncData]);
+  }, [transactions, paymentMethods, categories, syncData, isLoadingData, currentUser]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -132,6 +136,7 @@ const App: React.FC = () => {
     setCurrentUser(null);
     localStorage.removeItem('financeview_session');
     setTransactions([]);
+    setActiveTab('dashboard');
   };
 
   const currentMonthProjections = useMemo(() => 
@@ -236,7 +241,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-[11px] font-black text-gray-800 truncate">{currentUser.name}</p>
-                  <p className="text-[9px] text-gray-400 font-bold truncate">Online • Cloud</p>
+                  <p className="text-[9px] text-gray-400 font-bold truncate">MongoDB Active</p>
                 </div>
               </div>
               <button 
@@ -249,7 +254,7 @@ const App: React.FC = () => {
             
             <div className="flex items-center justify-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
               {isSyncing ? <Loader2 size={10} className="animate-spin text-blue-500" /> : <RefreshCw size={10} />}
-              {isSyncing ? "Sincronizando..." : "Nuvem Atualizada"}
+              {isSyncing ? "Sincronizando..." : "Cloud Sincronizada"}
             </div>
         </div>
       </aside>
@@ -288,7 +293,7 @@ const App: React.FC = () => {
                 {isLoadingData ? (
                   <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
                     <Loader2 size={40} className="animate-spin text-blue-600" />
-                    <p className="font-black text-xs uppercase tracking-widest">Carregando dados da nuvem...</p>
+                    <p className="font-black text-xs uppercase tracking-widest">Carregando seus dados...</p>
                   </div>
                 ) : (
                   <TransactionTable 
