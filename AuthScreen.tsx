@@ -1,0 +1,1 @@
+// Removido - utilize components/AuthScreen.tsx
