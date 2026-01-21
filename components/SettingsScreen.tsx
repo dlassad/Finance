@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, CheckCircle2, Circle } from 'lucide-react';
+import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { CategoryStructure, PaymentMethod } from '../types';
 import { CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
 
@@ -12,7 +12,10 @@ interface SettingsScreenProps {
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ 
-  paymentMethods, setPaymentMethods, categories, setCategories 
+  paymentMethods, 
+  setPaymentMethods, 
+  categories, 
+  setCategories
 }) => {
   const [newMethodName, setNewMethodName] = useState('');
   const [newMethodIsCard, setNewMethodIsCard] = useState(false);
@@ -117,7 +120,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Plus size={20} />
               </button>
             </div>
-            <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="flex items-center gap-3 cursor-pointer group">
                 <button 
                     type="button"
                     onClick={() => setNewMethodIsCard(!newMethodIsCard)}
@@ -126,7 +129,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${newMethodIsCard ? 'left-6' : 'left-1'}`} />
                 </button>
                 <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-blue-600">Possui Fatura (Cartão de Crédito)</span>
-            </label>
+            </div>
           </div>
 
           <div className="space-y-2">

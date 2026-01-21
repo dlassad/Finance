@@ -4,6 +4,12 @@ export enum EntryType {
   EXPENSE = 'EXPENSE'
 }
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
 export interface PaymentMethod {
   name: string;
   isCreditCard: boolean;
@@ -18,15 +24,15 @@ export interface Transaction {
   subcategory: string;
   cardSuffix?: string; 
   date: string;
-  billingDate?: string; // Formato YYYY-MM para controle de fatura
+  billingDate?: string;
   installments?: {
     current: number;
     total: number;
   };
   isRecurring: boolean;
-  overrides?: Record<string, number>; // Chave: Mês formatado (ex: "JAN. DE 2026"), Valor: número
-  color?: string; // Classe de fundo Tailwind
-  fontColor?: string; // Classe de cor de texto Tailwind
+  overrides?: Record<string, number>;
+  color?: string;
+  fontColor?: string;
   reconciled?: boolean;
 }
 
