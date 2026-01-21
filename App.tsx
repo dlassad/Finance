@@ -54,7 +54,6 @@ const App: React.FC = () => {
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Carregar dados do MongoDB
   const fetchData = useCallback(async () => {
     if (!currentUser) return;
     setIsLoadingData(true);
@@ -91,7 +90,6 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Sincronizar dados com MongoDB
   const syncData = useCallback(async () => {
     if (!currentUser || isLoadingData) return;
     setIsSyncing(true);
@@ -118,12 +116,11 @@ const App: React.FC = () => {
     if (currentUser) fetchData();
   }, [fetchData, currentUser]);
 
-  // Debounce sync quando houver mudanças (não sincroniza se estiver carregando inicialmente)
   useEffect(() => {
     if (isLoadingData || !currentUser) return;
     const timer = setTimeout(() => {
       syncData();
-    }, 1500);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [transactions, paymentMethods, categories, syncData, isLoadingData, currentUser]);
 
@@ -241,20 +238,20 @@ const App: React.FC = () => {
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-[11px] font-black text-gray-800 truncate">{currentUser.name}</p>
-                  <p className="text-[9px] text-gray-400 font-bold truncate">MongoDB Active</p>
+                  <p className="text-[9px] text-gray-400 font-bold truncate">Cloud Ativa</p>
                 </div>
               </div>
               <button 
                 onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 py-2 bg-white text-red-500 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-100 hover:bg-red-50 transition-colors"
               >
-                <LogOut size={14} /> Sair do App
+                <LogOut size={14} /> Sair
               </button>
             </div>
             
             <div className="flex items-center justify-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
               {isSyncing ? <Loader2 size={10} className="animate-spin text-blue-500" /> : <RefreshCw size={10} />}
-              {isSyncing ? "Sincronizando..." : "Cloud Sincronizada"}
+              {isSyncing ? "Salvando..." : "Sincronizado"}
             </div>
         </div>
       </aside>
@@ -287,7 +284,7 @@ const App: React.FC = () => {
                 <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-gray-800">Meus Lançamentos</h3>
                   <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                    Sincronizado via MongoDB Cloud
+                    MongoDB Cloud Protected
                   </div>
                 </div>
                 {isLoadingData ? (

@@ -32,7 +32,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
     try {
       if (!isLogin && !pwdValidation.isValid) {
-        throw new Error('A senha não atende aos requisitos mínimos de segurança.');
+        throw new Error('A senha não atende aos requisitos mínimos.');
       }
 
       const response = await fetch('/api/auth', {
@@ -41,20 +41,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         body: JSON.stringify({
           action: isLogin ? 'login' : 'register',
           email,
-          password,
-          name
+          password: password.trim(),
+          name: name.trim()
         })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro na autenticação');
+        throw new Error(data.error || 'Erro de conexão com o servidor.');
       }
 
       onLogin(data);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message === 'Failed to fetch' ? 'Erro de conexão: Verifique a MONGODB_URI no Vercel.' : err.message);
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +69,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               <Wallet size={32} />
             </div>
             <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">FinanceView</h1>
-            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">MongoDB Cloud Protected</p>
+            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">Nuvem MongoDB Atlas</p>
           </div>
 
           <form onSubmit={handleAuth} className="space-y-5">
@@ -120,10 +120,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
             {!isLogin && password.length > 0 && (
               <div className="bg-gray-50 p-4 rounded-2xl space-y-2 border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Regras de Senha:</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Segurança:</p>
                 <div className="flex items-center gap-2 text-[10px] font-bold">
                   {pwdValidation.hasMinLength ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
-                  <span className={pwdValidation.hasMinLength ? 'text-green-600' : 'text-gray-400'}>8+ caracteres</span>
+                  <span className={pwdValidation.hasMinLength ? 'text-green-600' : 'text-gray-400'}>8+ carac.</span>
                   {pwdValidation.hasUpper ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
                   <span className={pwdValidation.hasUpper ? 'text-green-600' : 'text-gray-400'}>Maiúscula</span>
                   {pwdValidation.hasSpecial ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
@@ -132,7 +132,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               </div>
             )}
 
-            {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[11px] font-black text-center uppercase border border-red-100">{error}</div>}
+            {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-black text-center uppercase border border-red-100">{error}</div>}
 
             <button
               type="submit"
