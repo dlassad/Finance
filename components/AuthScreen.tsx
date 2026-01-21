@@ -59,7 +59,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             <div className="bg-blue-600 p-4 rounded-3xl text-white shadow-xl mb-4">
               <Wallet size={32} />
             </div>
-            <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">FinanceView</h1>
+            <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">Finance</h1>
             <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">MongoDB Cloud Protected</p>
           </div>
 

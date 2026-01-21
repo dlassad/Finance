@@ -203,7 +203,7 @@ const App: React.FC = () => {
               <Wallet size={24} />
             </div>
             <h1 className="text-2xl font-black bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent">
-              FinanceView
+              Finance
             </h1>
           </div>
 
