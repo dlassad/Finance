@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   TrendingUp, 
@@ -15,9 +14,7 @@ import {
   ChevronRight,
   Calendar,
   LogOut,
-  User as UserIcon,
-  RefreshCw,
-  Loader2
+  User as UserIcon
 } from 'lucide-react';
 
 import { Transaction, EntryType, CardGroup, CategoryStructure, PaymentMethod, User } from './types';
@@ -41,8 +38,6 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [categories, setCategories] = useState<CategoryStructure>({});
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projections' | 'cards' | 'settings'>('dashboard');
   const [projectionMonths, setProjectionMonths] = useState(60);
@@ -54,78 +49,35 @@ const App: React.FC = () => {
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Carregar dados iniciais do MongoDB
-  const fetchData = useCallback(async () => {
-    if (!currentUser) return;
-    setIsLoadingData(true);
-    try {
-      const response = await fetch('/api/transactions', {
-        headers: { 'x-user-id': currentUser.id }
-      });
+  // Carregamento de dados específicos do usuário
+  useEffect(() => {
+    if (currentUser) {
+      const userPrefix = `financeview_user_${currentUser.id}`;
       
-      if (!response.ok) throw new Error('Falha ao conectar com MongoDB');
-      
-      const data = await response.json();
-      
-      if (data.transactions && data.transactions.length > 0) {
-        setTransactions(data.transactions);
-      } else {
-        setTransactions(INITIAL_TRANSACTIONS);
-      }
+      const savedTransactions = localStorage.getItem(`${userPrefix}_transactions`);
+      setTransactions(savedTransactions ? JSON.parse(savedTransactions) : INITIAL_TRANSACTIONS);
 
-      if (data.settings && data.settings.paymentMethods) {
-        setPaymentMethods(data.settings.paymentMethods);
-        setCategories(data.settings.categories);
-      } else {
-        setPaymentMethods([
-          { name: 'DINHEIRO', isCreditCard: false },
-          { name: 'PIX', isCreditCard: false },
-          ...DEFAULT_CARDS.map(c => ({ name: c, isCreditCard: true }))
-        ]);
-        setCategories(DEFAULT_CATEGORIES);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar dados:", err);
-    } finally {
-      setIsLoadingData(false);
+      const savedMethods = localStorage.getItem(`${userPrefix}_payment_methods`);
+      setPaymentMethods(savedMethods ? JSON.parse(savedMethods) : [
+        { name: 'DINHEIRO', isCreditCard: false },
+        { name: 'PIX', isCreditCard: false },
+        ...DEFAULT_CARDS.map(c => ({ name: c, isCreditCard: true }))
+      ]);
+
+      const savedCats = localStorage.getItem(`${userPrefix}_categories`);
+      setCategories(savedCats ? JSON.parse(savedCats) : DEFAULT_CATEGORIES);
     }
   }, [currentUser]);
 
-  // Sincronizar alterações com MongoDB
-  const syncData = useCallback(async () => {
-    if (!currentUser || isLoadingData) return;
-    setIsSyncing(true);
-    try {
-      await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-user-id': currentUser.id 
-        },
-        body: JSON.stringify({
-          transactions,
-          settings: { paymentMethods, categories }
-        })
-      });
-    } catch (err) {
-      console.error("Erro ao sincronizar:", err);
-    } finally {
-      setIsSyncing(false);
+  // Persistência por usuário
+  useEffect(() => {
+    if (currentUser) {
+      const userPrefix = `financeview_user_${currentUser.id}`;
+      localStorage.setItem(`${userPrefix}_transactions`, JSON.stringify(transactions));
+      localStorage.setItem(`${userPrefix}_payment_methods`, JSON.stringify(paymentMethods));
+      localStorage.setItem(`${userPrefix}_categories`, JSON.stringify(categories));
     }
-  }, [currentUser, transactions, paymentMethods, categories, isLoadingData]);
-
-  useEffect(() => {
-    if (currentUser) fetchData();
-  }, [fetchData, currentUser]);
-
-  // Debounce para evitar múltiplas chamadas seguidas à API
-  useEffect(() => {
-    if (isLoadingData || !currentUser) return;
-    const timer = setTimeout(() => {
-      syncData();
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [transactions, paymentMethods, categories, syncData, isLoadingData, currentUser]);
+  }, [transactions, paymentMethods, categories, currentUser]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -135,8 +87,6 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('financeview_session');
-    setTransactions([]);
-    setActiveTab('dashboard');
   };
 
   const currentMonthProjections = useMemo(() => 
@@ -149,7 +99,7 @@ const App: React.FC = () => {
     [currentMonthProjections, projectionMonths]
   );
 
-  const currentSummary = currentMonthProjections[0] || { income: 0, expense: 0, balance: 0 };
+  const currentSummary = currentMonthProjections[0];
 
   const creditCardsOnly = useMemo(() => 
     paymentMethods.filter(pm => pm.isCreditCard).map(pm => pm.name),
@@ -222,7 +172,7 @@ const App: React.FC = () => {
               <Wallet size={24} />
             </div>
             <h1 className="text-2xl font-black bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent">
-              FinanceView
+              Finance
             </h1>
           </div>
 
@@ -241,21 +191,17 @@ const App: React.FC = () => {
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-[11px] font-black text-gray-800 truncate">{currentUser.name}</p>
-                  <p className="text-[9px] text-gray-400 font-bold truncate">Cloud Ativa</p>
+                  <p className="text-[9px] text-gray-400 font-bold truncate">{currentUser.email}</p>
                 </div>
               </div>
               <button 
                 onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 py-2 bg-white text-red-500 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-100 hover:bg-red-50 transition-colors"
               >
-                <LogOut size={14} /> Sair
+                <LogOut size={14} /> Sair do App
               </button>
             </div>
-            
-            <div className="flex items-center justify-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
-              {isSyncing ? <Loader2 size={10} className="animate-spin text-blue-500" /> : <RefreshCw size={10} />}
-              {isSyncing ? "Sincronizando..." : "Nuvem Atualizada"}
-            </div>
+          </div>
         </div>
       </aside>
 
@@ -270,7 +216,6 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-             {isLoadingData && <Loader2 size={18} className="animate-spin text-blue-600 mr-2" />}
             <button onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl transition-all shadow-lg shadow-blue-200 font-bold flex items-center gap-2"><Plus size={18} /><span>Novo</span></button>
           </div>
         </header>
@@ -285,25 +230,16 @@ const App: React.FC = () => {
               </div>
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                  <h3 className="text-xl font-bold text-gray-800">Meus Lançamentos</h3>
-                  <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                    Sincronizado via MongoDB Cloud
-                  </div>
+                  <h3 className="text-xl font-bold text-gray-800">Seus Lançamentos</h3>
+                  <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Base de Dados de {currentUser.name.split(' ')[0]}</div>
                 </div>
-                {isLoadingData ? (
-                  <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
-                    <Loader2 size={40} className="animate-spin text-blue-600" />
-                    <p className="font-black text-xs uppercase tracking-widest">Acessando seus dados na nuvem...</p>
-                  </div>
-                ) : (
-                  <TransactionTable 
-                    transactions={transactions} 
-                    onDelete={(id) => { 
-                      setTransactions(prev => prev.filter(t => t.id !== id));
-                    }} 
-                    onEdit={handleEditClick} 
-                  />
-                )}
+                <TransactionTable 
+                  transactions={transactions} 
+                  onDelete={(id) => { 
+                    setTransactions(prev => prev.filter(t => t.id !== id));
+                  }} 
+                  onEdit={handleEditClick} 
+                />
               </div>
             </>
           )}

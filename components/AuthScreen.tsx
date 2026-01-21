@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Wallet, Mail, Lock, User as UserIcon, ArrowRight, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Wallet, Mail, Lock, User as UserIcon, ArrowRight, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { User } from '../types';
 
 interface AuthScreenProps {
@@ -14,7 +13,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   const validatePassword = (pass: string) => {
     const hasUpper = /[A-Z]/.test(pass);
@@ -25,39 +23,39 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
   const pwdValidation = validatePassword(password);
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
 
-    try {
-      if (!isLogin && !pwdValidation.isValid) {
-        throw new Error('A senha deve ter 8+ caracteres, uma maiúscula e um caractere especial.');
+    const usersStr = localStorage.getItem('financeview_users');
+    const users = usersStr ? JSON.parse(usersStr) : [];
+
+    if (isLogin) {
+      const user = users.find((u: any) => u.email === email && u.password === password);
+      if (user) {
+        onLogin({ id: user.id, email: user.email, name: user.name });
+      } else {
+        setError('E-mail ou senha incorretos.');
+      }
+    } else {
+      if (!pwdValidation.isValid) {
+        setError('A senha não atende aos requisitos de segurança.');
+        return;
+      }
+      if (users.find((u: any) => u.email === email)) {
+        setError('Este e-mail já está cadastrado.');
+        return;
       }
 
-      const response = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: isLogin ? 'login' : 'register',
-          email: email.toLowerCase().trim(),
-          password,
-          name: name.trim()
-        })
-      });
+      const newUser = {
+        id: Math.random().toString(36).substr(2, 9),
+        name,
+        email,
+        password
+      };
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Não foi possível completar a solicitação.');
-      }
-
-      onLogin(data);
-    } catch (err: any) {
-      console.error("Auth Error:", err);
-      setError(err.message === 'Failed to fetch' ? 'Erro de conexão com o servidor. Verifique se o Vercel está configurado.' : err.message);
-    } finally {
-      setIsLoading(false);
+      localStorage.setItem('financeview_users', JSON.stringify([...users, newUser]));
+      onLogin({ id: newUser.id, email: newUser.email, name: newUser.name });
     }
   };
 
@@ -66,14 +64,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-500">
         <div className="p-10">
           <div className="flex flex-col items-center mb-10">
-            <div className="bg-blue-600 p-4 rounded-3xl text-white shadow-xl mb-4">
+            <div className="bg-blue-600 p-4 rounded-3xl text-white shadow-xl shadow-blue-200 mb-4">
               <Wallet size={32} />
             </div>
-            <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">FinanceView</h1>
-            <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">MongoDB Atlas Protected</p>
+            <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase">Finance</h1>
+            <p className="text-gray-400 font-bold text-xs uppercase tracking-widest mt-1">Smart Personal Budget</p>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-5">
+          <form onSubmit={handleAuth} className="space-y-6">
             {!isLogin && (
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -83,7 +81,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold text-sm"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  required={!isLogin}
+                  required
                 />
               </div>
             )}
@@ -121,40 +119,37 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
             {!isLogin && password.length > 0 && (
               <div className="bg-gray-50 p-4 rounded-2xl space-y-2 border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Segurança:</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
-                    {pwdValidation.hasMinLength ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
-                    <span className={pwdValidation.hasMinLength ? 'text-green-600' : 'text-gray-400'}>8+ dig.</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
-                    {pwdValidation.hasUpper ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
-                    <span className={pwdValidation.hasUpper ? 'text-green-600' : 'text-gray-400'}>ABC</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
-                    {pwdValidation.hasSpecial ? <CheckCircle2 size={12} className="text-green-500" /> : <XCircle size={12} className="text-red-400" />}
-                    <span className={pwdValidation.hasSpecial ? 'text-green-600' : 'text-gray-400'}>!@#</span>
-                  </div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Requisitos de Segurança:</p>
+                <div className="flex items-center gap-2 text-[11px] font-bold">
+                  {pwdValidation.hasMinLength ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-red-400" />}
+                  <span className={pwdValidation.hasMinLength ? 'text-green-600' : 'text-gray-500'}>Mínimo 8 caracteres</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-bold">
+                  {pwdValidation.hasUpper ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-red-400" />}
+                  <span className={pwdValidation.hasUpper ? 'text-green-600' : 'text-gray-500'}>Uma letra maiúscula</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-bold">
+                  {pwdValidation.hasSpecial ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-red-400" />}
+                  <span className={pwdValidation.hasSpecial ? 'text-green-600' : 'text-gray-500'}>Um caractere especial (!@#$)</span>
                 </div>
               </div>
             )}
 
-            {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-[10px] font-black text-center uppercase border border-red-100 leading-tight">{error}</div>}
+            {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs disabled:opacity-50"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
             >
-              {isLoading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Entrar no Sistema' : 'Criar minha Conta')}
-              {!isLoading && <ArrowRight size={18} />}
+              {isLogin ? 'Entrar no Sistema' : 'Criar minha Conta'}
+              <ArrowRight size={18} />
             </button>
           </form>
 
           <div className="mt-8 pt-8 border-t border-gray-100 text-center">
             <button
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="text-gray-400 hover:text-blue-600 text-[10px] font-black uppercase tracking-widest transition-colors"
+              className="text-gray-400 hover:text-blue-600 text-sm font-bold transition-colors"
             >
               {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
             </button>
