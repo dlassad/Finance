@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, Mail, Lock, User as UserIcon, ArrowRight, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
+import { Wallet, Mail, Lock, User as UserIcon, ArrowRight, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { User } from '../types';
 
 interface AuthScreenProps {
@@ -13,6 +13,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const validatePassword = (pass: string) => {
     const hasUpper = /[A-Z]/.test(pass);
@@ -23,39 +24,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
   const pwdValidation = validatePassword(password);
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    const usersStr = localStorage.getItem('financeview_users');
-    const users = usersStr ? JSON.parse(usersStr) : [];
-
-    if (isLogin) {
-      const user = users.find((u: any) => u.email === email && u.password === password);
-      if (user) {
-        onLogin({ id: user.id, email: user.email, name: user.name });
-      } else {
-        setError('E-mail ou senha incorretos.');
-      }
-    } else {
-      if (!pwdValidation.isValid) {
+    try {
+      if (!isLogin && !pwdValidation.isValid) {
         setError('A senha não atende aos requisitos de segurança.');
-        return;
-      }
-      if (users.find((u: any) => u.email === email)) {
-        setError('Este e-mail já está cadastrado.');
+        setLoading(false);
         return;
       }
 
-      const newUser = {
-        id: Math.random().toString(36).substr(2, 9),
-        name,
-        email,
-        password
-      };
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isLogin ? 'login' : 'register',
+          email,
+          password,
+          name: isLogin ? undefined : name
+        })
+      });
 
-      localStorage.setItem('financeview_users', JSON.stringify([...users, newUser]));
-      onLogin({ id: newUser.id, email: newUser.email, name: newUser.name });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Erro na autenticação');
+      }
+
+      onLogin(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -139,10 +141,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLogin ? 'Entrar no Sistema' : 'Criar minha Conta'}
-              <ArrowRight size={18} />
+              {loading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" /> Processando...
+                </>
+              ) : (
+                <>
+                  {isLogin ? 'Entrar no Sistema' : 'Criar minha Conta'}
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
 

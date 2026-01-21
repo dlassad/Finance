@@ -14,12 +14,13 @@ import {
   ChevronRight,
   Calendar,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
 import { Transaction, EntryType, CardGroup, CategoryStructure, PaymentMethod, User } from './types';
-import { INITIAL_TRANSACTIONS, CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from './constants';
-import { formatCurrency, calculateProjections, getMonthYear } from './utils';
+import { calculateProjections, getMonthYear, formatCurrency } from './utils';
 import { SummaryCard } from './components/SummaryCard';
 import { TransactionTable } from './components/TransactionTable';
 import { AddTransactionModal } from './components/AddTransactionModal';
@@ -35,6 +36,10 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [categories, setCategories] = useState<CategoryStructure>({});
@@ -49,35 +54,59 @@ const App: React.FC = () => {
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Carregamento de dados específicos do usuário
+  // Carregar dados da API
   useEffect(() => {
-    if (currentUser) {
-      const userPrefix = `financeview_user_${currentUser.id}`;
-      
-      const savedTransactions = localStorage.getItem(`${userPrefix}_transactions`);
-      setTransactions(savedTransactions ? JSON.parse(savedTransactions) : INITIAL_TRANSACTIONS);
-
-      const savedMethods = localStorage.getItem(`${userPrefix}_payment_methods`);
-      setPaymentMethods(savedMethods ? JSON.parse(savedMethods) : [
-        { name: 'DINHEIRO', isCreditCard: false },
-        { name: 'PIX', isCreditCard: false },
-        ...DEFAULT_CARDS.map(c => ({ name: c, isCreditCard: true }))
-      ]);
-
-      const savedCats = localStorage.getItem(`${userPrefix}_categories`);
-      setCategories(savedCats ? JSON.parse(savedCats) : DEFAULT_CATEGORIES);
+    async function loadData() {
+      if (currentUser) {
+        setIsLoading(true);
+        try {
+          const res = await fetch(`/api/data?userId=${currentUser.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setTransactions(data.transactions || []);
+            setCategories(data.categories || {});
+            setPaymentMethods(data.paymentMethods || []);
+            setDataLoaded(true);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados", error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setDataLoaded(false);
+        setTransactions([]);
+      }
     }
+    loadData();
   }, [currentUser]);
 
-  // Persistência por usuário
+  // Salvar dados na API (Debounce manual via effect)
   useEffect(() => {
-    if (currentUser) {
-      const userPrefix = `financeview_user_${currentUser.id}`;
-      localStorage.setItem(`${userPrefix}_transactions`, JSON.stringify(transactions));
-      localStorage.setItem(`${userPrefix}_payment_methods`, JSON.stringify(paymentMethods));
-      localStorage.setItem(`${userPrefix}_categories`, JSON.stringify(categories));
-    }
-  }, [transactions, paymentMethods, categories, currentUser]);
+    if (!currentUser || !dataLoaded) return;
+
+    const timeoutId = setTimeout(async () => {
+      setIsSaving(true);
+      try {
+        await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            transactions,
+            categories,
+            paymentMethods
+          })
+        });
+      } catch (error) {
+        console.error("Erro ao salvar dados", error);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000); // Salva 1 segundo após a última alteração
+
+    return () => clearTimeout(timeoutId);
+  }, [transactions, paymentMethods, categories, currentUser, dataLoaded]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -87,6 +116,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('financeview_session');
+    setDataLoaded(false);
   };
 
   const currentMonthProjections = useMemo(() => 
@@ -163,6 +193,15 @@ const App: React.FC = () => {
     return <AuthScreen onLogin={handleLogin} />;
   }
 
+  if (isLoading && !dataLoaded) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-gray-50 text-blue-600 gap-4">
+        <Loader2 size={48} className="animate-spin" />
+        <p className="font-black uppercase tracking-widest text-sm">Carregando seus dados...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex bg-gray-50 overflow-hidden">
       <aside className={`fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-100 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -189,10 +228,11 @@ const App: React.FC = () => {
                 <div className="bg-blue-100 p-2 rounded-xl text-blue-600">
                   <UserIcon size={16} />
                 </div>
-                <div className="overflow-hidden">
+                <div className="overflow-hidden flex-1">
                   <p className="text-[11px] font-black text-gray-800 truncate">{currentUser.name}</p>
                   <p className="text-[9px] text-gray-400 font-bold truncate">{currentUser.email}</p>
                 </div>
+                {isSaving && <RefreshCw size={14} className="animate-spin text-blue-500" />}
               </div>
               <button 
                 onClick={handleLogout}
