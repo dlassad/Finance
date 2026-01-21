@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   TrendingUp, 
@@ -16,11 +17,11 @@ import {
   LogOut,
   User as UserIcon,
   RefreshCw,
-  Loader2,
-  WifiOff
+  Loader2
 } from 'lucide-react';
 
 import { Transaction, EntryType, CardGroup, CategoryStructure, PaymentMethod, User } from './types';
+import { INITIAL_TRANSACTIONS, CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from './constants';
 import { formatCurrency, calculateProjections, getMonthYear } from './utils';
 import { SummaryCard } from './components/SummaryCard';
 import { TransactionTable } from './components/TransactionTable';
@@ -30,25 +31,18 @@ import { ReconciliationModal } from './components/ReconciliationModal';
 import { SettingsScreen } from './components/SettingsScreen';
 import { AdjustmentModal } from './components/AdjustmentModal';
 import { AuthScreen } from './components/AuthScreen';
-import { dataService } from './services/dataService';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem('financeview_session');
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
+    const saved = localStorage.getItem('financeview_session');
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [categories, setCategories] = useState<CategoryStructure>({});
-  
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projections' | 'cards' | 'settings'>('dashboard');
   const [projectionMonths, setProjectionMonths] = useState(60);
@@ -60,53 +54,78 @@ const App: React.FC = () => {
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Carregamento Inicial
-  const loadData = useCallback(async () => {
+  // Carregar dados iniciais do MongoDB
+  const fetchData = useCallback(async () => {
     if (!currentUser) return;
     setIsLoadingData(true);
-    
     try {
-      const data = await dataService.fetchData(currentUser.id);
-      setTransactions(data.transactions);
-      setPaymentMethods(data.settings.paymentMethods);
-      setCategories(data.settings.categories);
-    } catch (error) {
-      console.error("Erro fatal ao carregar dados", error);
-      setIsOfflineMode(true);
+      const response = await fetch('/api/transactions', {
+        headers: { 'x-user-id': currentUser.id }
+      });
+      
+      if (!response.ok) throw new Error('Falha ao conectar com MongoDB');
+      
+      const data = await response.json();
+      
+      if (data.transactions && data.transactions.length > 0) {
+        setTransactions(data.transactions);
+      } else {
+        setTransactions(INITIAL_TRANSACTIONS);
+      }
+
+      if (data.settings && data.settings.paymentMethods) {
+        setPaymentMethods(data.settings.paymentMethods);
+        setCategories(data.settings.categories);
+      } else {
+        setPaymentMethods([
+          { name: 'DINHEIRO', isCreditCard: false },
+          { name: 'PIX', isCreditCard: false },
+          ...DEFAULT_CARDS.map(c => ({ name: c, isCreditCard: true }))
+        ]);
+        setCategories(DEFAULT_CATEGORIES);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
     } finally {
       setIsLoadingData(false);
     }
   }, [currentUser]);
 
-  // Sincronização Automática
-  const saveData = useCallback(async () => {
+  // Sincronizar alterações com MongoDB
+  const syncData = useCallback(async () => {
     if (!currentUser || isLoadingData) return;
     setIsSyncing(true);
     try {
-      await dataService.syncData(currentUser.id, {
-        transactions,
-        settings: { paymentMethods, categories }
+      await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id 
+        },
+        body: JSON.stringify({
+          transactions,
+          settings: { paymentMethods, categories }
+        })
       });
-      setIsOfflineMode(false);
     } catch (err) {
-      setIsOfflineMode(true);
+      console.error("Erro ao sincronizar:", err);
     } finally {
       setIsSyncing(false);
     }
   }, [currentUser, transactions, paymentMethods, categories, isLoadingData]);
 
   useEffect(() => {
-    if (currentUser) loadData();
-  }, [loadData, currentUser]);
+    if (currentUser) fetchData();
+  }, [fetchData, currentUser]);
 
-  // Debounce save
+  // Debounce para evitar múltiplas chamadas seguidas à API
   useEffect(() => {
     if (isLoadingData || !currentUser) return;
     const timer = setTimeout(() => {
-      saveData();
+      syncData();
     }, 2000);
     return () => clearTimeout(timer);
-  }, [transactions, paymentMethods, categories, saveData, isLoadingData, currentUser]);
+  }, [transactions, paymentMethods, categories, syncData, isLoadingData, currentUser]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -203,7 +222,7 @@ const App: React.FC = () => {
               <Wallet size={24} />
             </div>
             <h1 className="text-2xl font-black bg-gradient-to-r from-blue-700 to-blue-500 bg-clip-text text-transparent">
-              Finance
+              FinanceView
             </h1>
           </div>
 
@@ -222,9 +241,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-[11px] font-black text-gray-800 truncate">{currentUser.name}</p>
-                  <p className="text-[9px] text-gray-400 font-bold truncate">
-                    {isOfflineMode ? 'Modo Offline' : 'Cloud Ativa'}
-                  </p>
+                  <p className="text-[9px] text-gray-400 font-bold truncate">Cloud Ativa</p>
                 </div>
               </div>
               <button 
@@ -236,8 +253,8 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex items-center justify-center gap-2 text-[9px] font-black text-gray-300 uppercase tracking-widest">
-              {isSyncing ? <Loader2 size={10} className="animate-spin text-blue-500" /> : (isOfflineMode ? <WifiOff size={10} className="text-orange-400"/> : <RefreshCw size={10} />)}
-              {isSyncing ? "Sincronizando..." : (isOfflineMode ? "Salvo Localmente" : "Nuvem Atualizada")}
+              {isSyncing ? <Loader2 size={10} className="animate-spin text-blue-500" /> : <RefreshCw size={10} />}
+              {isSyncing ? "Sincronizando..." : "Nuvem Atualizada"}
             </div>
         </div>
       </aside>
@@ -269,14 +286,14 @@ const App: React.FC = () => {
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-gray-800">Meus Lançamentos</h3>
-                  <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${isOfflineMode ? 'bg-orange-50 text-orange-500 border-orange-100' : 'bg-blue-50 text-blue-500 border-blue-100'}`}>
-                    {isOfflineMode ? 'Armazenamento Local' : 'Sincronizado via MongoDB Cloud'}
+                  <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                    Sincronizado via MongoDB Cloud
                   </div>
                 </div>
                 {isLoadingData ? (
                   <div className="py-20 flex flex-col items-center justify-center text-gray-400 space-y-4">
                     <Loader2 size={40} className="animate-spin text-blue-600" />
-                    <p className="font-black text-xs uppercase tracking-widest">Acessando seus dados...</p>
+                    <p className="font-black text-xs uppercase tracking-widest">Acessando seus dados na nuvem...</p>
                   </div>
                 ) : (
                   <TransactionTable 

@@ -1,27 +1,27 @@
+
 import { MongoClient } from 'mongodb';
 
 const uri = process.env.MONGODB_URI || "";
 const options = {};
 
 if (!uri) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('Por favor, defina a variável de ambiente MONGODB_URI');
-  }
+  console.error("ERRO: MONGODB_URI não definida nas variáveis de ambiente!");
 }
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
-declare global {
-  var _mongoClientPromise: Promise<MongoClient> | undefined;
-}
-
 if (process.env.NODE_ENV === 'development') {
-  if (!globalThis._mongoClientPromise) {
+  // Use globalThis instead of global to fix "Cannot find name 'global'" error
+  let globalWithMongo = globalThis as typeof globalThis & {
+    _mongoClientPromise?: Promise<MongoClient>;
+  };
+
+  if (!globalWithMongo._mongoClientPromise) {
     client = new MongoClient(uri, options);
-    globalThis._mongoClientPromise = client.connect();
+    globalWithMongo._mongoClientPromise = client.connect();
   }
-  clientPromise = globalThis._mongoClientPromise;
+  clientPromise = globalWithMongo._mongoClientPromise;
 } else {
   client = new MongoClient(uri, options);
   clientPromise = client.connect();
