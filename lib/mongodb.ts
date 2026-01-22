@@ -2,10 +2,6 @@ import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-  throw new Error('Defina a variável de ambiente MONGODB_URI no Vercel');
-}
-
 let cached = (global as any).mongoose;
 
 if (!cached) {
@@ -13,6 +9,10 @@ if (!cached) {
 }
 
 async function connectToDatabase() {
+  if (!MONGODB_URI) {
+    throw new Error('A variável de ambiente MONGODB_URI não está definida no Vercel. Configure-a em Settings > Environment Variables.');
+  }
+
   if (cached.conn) {
     return cached.conn;
   }
@@ -22,7 +22,7 @@ async function connectToDatabase() {
       bufferCommands: false,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
       return mongoose;
     });
   }

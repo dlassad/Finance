@@ -5,5 +5,14 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000', // Caso use vercel dev localmente
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   }
 })
