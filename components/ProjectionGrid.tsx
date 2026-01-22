@@ -264,15 +264,14 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
     let containerClasses = "mx-2 my-2 p-3 rounded-2xl border transition-all group/item relative cursor-pointer ";
     
     // Lógica de Prioridade de Cores:
-    // 1. Se tem COR ESPECÍFICA para o mês: Usa a cor e borda padrão. (Ignora estilo de edição amarelo)
-    // 2. Se tem OVERRIDE (valor) mas SEM COR específica: Usa estilo Amarelo (Amber) para indicar edição.
-    // 3. Padrão: Usa cor global e efeitos de hover.
-
     if (t.isSpecificColor) {
+        // Se tem cor específica, usamos ela e adicionamos sombra.
         containerClasses += `border-gray-200 shadow-sm ${t.color}`;
     } else if (t.hasOverride) {
+        // Se tem override APENAS de valor (sem cor específica), usamos o amarelo de edição.
         containerClasses += "bg-amber-50 border-amber-200 shadow-sm";
     } else {
+        // Padrão (sem override)
         containerClasses += `border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md ${t.color || ''}`;
     }
 

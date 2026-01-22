@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -31,15 +31,14 @@ import { ReconciliationModal } from './components/ReconciliationModal';
 import { SettingsScreen } from './components/SettingsScreen';
 import { AdjustmentModal } from './components/AdjustmentModal';
 import { AuthScreen } from './components/AuthScreen';
-import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE, MASTER_EMAIL } from './constants';
+import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE } from './constants';
 
 const App: React.FC = () => {
-  // Removido o uso de localStorage para iniciar o estado
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState(false); // Novo estado para erro de salvamento
+  const [saveError, setSaveError] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -53,14 +52,12 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
-  // Estado para controlar a divisão de série (recorrência)
   const [splitOriginalId, setSplitOriginalId] = useState<string | null>(null);
 
   const [adjustingTransaction, setAdjustingTransaction] = useState<{t: Transaction, month: string, date: Date} | null>(null);
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Estado para seleção múltipla na tabela
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
 
   // Carregar dados da API
@@ -69,18 +66,15 @@ const App: React.FC = () => {
       if (currentUser) {
         setIsLoading(true);
         try {
-          console.log("Carregando dados para:", currentUser.id);
           const res = await fetch(`/api/data?userId=${currentUser.id}`);
           
           if (res.ok) {
             const data = await res.json();
-            console.log("Dados carregados com sucesso:", data);
             setTransactions(data.transactions || []);
             setCategories(data.categories || CATEGORY_STRUCTURE);
             setPaymentMethods(data.paymentMethods || []);
             setDataLoaded(true);
           } else if (res.status === 404) {
-            console.log("Dados não encontrados (404), inicializando novo perfil...");
             setTransactions(INITIAL_TRANSACTIONS);
             setCategories(CATEGORY_STRUCTURE);
             setPaymentMethods([
@@ -88,9 +82,7 @@ const App: React.FC = () => {
                 { name: 'PIX', isCreditCard: false },
                 ...CARD_SUFFIXES.map(c => ({ name: c, isCreditCard: true }))
             ]);
-            setDataLoaded(true); // Permite salvar imediatamente
-          } else {
-            console.error("Erro ao carregar dados. Status:", res.status);
+            setDataLoaded(true);
           }
         } catch (error) {
           console.error("Erro de rede ao carregar dados", error);
@@ -113,7 +105,6 @@ const App: React.FC = () => {
       setIsSaving(true);
       setSaveError(false);
       try {
-        console.log("Iniciando salvamento automático...");
         const res = await fetch('/api/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -126,11 +117,7 @@ const App: React.FC = () => {
         });
 
         if (!res.ok) {
-            const errText = await res.text();
-            console.error("Erro ao salvar dados:", errText);
             setSaveError(true);
-        } else {
-            console.log("Dados salvos com sucesso.");
         }
       } catch (error) {
         console.error("Erro de rede ao salvar dados", error);
@@ -145,12 +132,10 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    // Removido salvamento em localStorage
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    // Removido remoção de localStorage pois não salvamos mais lá
     setDataLoaded(false);
   };
 
@@ -179,7 +164,6 @@ const App: React.FC = () => {
       const method = paymentMethods.find(pm => pm.name === t.cardSuffix);
       if (!method || !method.isCreditCard) return false;
       
-      // Check endDate
       if (t.endDate) {
          const endD = new Date(t.endDate);
          if (endD < new Date(selectedCardDate.getFullYear(), selectedCardDate.getMonth(), 1)) return false;
@@ -187,7 +171,6 @@ const App: React.FC = () => {
 
       let baseDate = t.billingDate ? new Date(t.billingDate + '-01T12:00:00') : new Date(t.date);
       
-      // Futuro relativo a este cartao
       if (baseDate > new Date(selectedCardDate.getFullYear(), selectedCardDate.getMonth() + 1, 0)) return false;
 
       if (t.isRecurring) return true;
@@ -208,7 +191,6 @@ const App: React.FC = () => {
     });
 
     return Object.entries(groups).map(([suffix, txs]) => {
-      // Encontrar o método de pagamento para obter os dados de vencimento
       const paymentMethod = paymentMethods.find(pm => pm.name === suffix);
       
       return {
@@ -225,19 +207,13 @@ const App: React.FC = () => {
   }, [transactions, selectedCardDate, paymentMethods]);
 
   const handleSaveTransaction = (data: Omit<Transaction, 'id'> | Transaction) => {
-    // 1. PRIORIDADE: Se estiver em modo Split Series, executa a divisão
     if (splitOriginalId) {
        const newTransaction = { ...data, id: Math.random().toString(36).substr(2, 9) };
-       
-       // Data segura para manipulação
        const [y, m, d] = newTransaction.date.split('-').map(Number);
-       const startDateOfNew = new Date(y, m - 1, d); // Cria em hora local 00:00
-       
-       // A data de fim da antiga deve ser o dia anterior ao início da nova
+       const startDateOfNew = new Date(y, m - 1, d);
        const endDateOfOld = new Date(startDateOfNew);
        endDateOfOld.setDate(endDateOfOld.getDate() - 1);
        
-       // Formata endDateOfOld para YYYY-MM-DD
        const endYear = endDateOfOld.getFullYear();
        const endMonth = String(endDateOfOld.getMonth() + 1).padStart(2, '0');
        const endDay = String(endDateOfOld.getDate()).padStart(2, '0');
@@ -258,11 +234,9 @@ const App: React.FC = () => {
        return;
     } 
     
-    // 2. Comportamento normal de edição
     if ('id' in data && data.id) {
       setTransactions(prev => prev.map(t => t.id === data.id ? (data as Transaction) : t));
     } 
-    // 3. Comportamento normal de criação
     else {
       const tx: Transaction = { ...data, id: Math.random().toString(36).substr(2, 9) };
       setTransactions(prev => [...prev, tx]);
@@ -289,8 +263,6 @@ const App: React.FC = () => {
   };
   
   const handleSplitSeries = (transaction: Transaction, selectedDate: Date) => {
-    // Prepara a "nova" transação para iniciar no dia 1 do mês selecionado
-    // Utiliza data local para evitar problemas de fuso
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const day = "01";
@@ -299,14 +271,13 @@ const App: React.FC = () => {
     
     const newTxData = {
       ...transaction,
-      id: undefined, // Remove ID para ser tratada como nova no form
+      id: undefined, 
       date: newStartDateStr,
-      // Limpa overrides antigos pois é uma nova serie
       overrides: undefined, 
       colorOverrides: undefined,
       fontColorOverrides: undefined,
       endDate: undefined,
-      reconciled: false // Reseta status de conciliação para a nova série futura
+      reconciled: false 
     };
     
     // @ts-ignore
@@ -315,7 +286,6 @@ const App: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // Funções de Seleção Múltipla
   const handleToggleSelect = (id: string) => {
     const newSelected = new Set(selectedTransactionIds);
     if (newSelected.has(id)) {
@@ -438,7 +408,6 @@ const App: React.FC = () => {
                   transactions={transactions} 
                   onDelete={(id) => { 
                     setTransactions(prev => prev.filter(t => t.id !== id));
-                    // Remover da seleção se estiver selecionado
                     if (selectedTransactionIds.has(id)) {
                       const newSet = new Set(selectedTransactionIds);
                       newSet.delete(id);
@@ -558,8 +527,8 @@ const App: React.FC = () => {
                 delete newFontColorOverrides[mk];
             } else {
                 newOverrides[mk] = amt;
-                if (col) newColorOverrides[mk] = col;
-                if (fCol) newFontColorOverrides[mk] = fCol;
+                if (col !== undefined) newColorOverrides[mk] = col;
+                if (fCol !== undefined) newFontColorOverrides[mk] = fCol;
             }
             
             return { 

@@ -27,7 +27,7 @@ export interface Transaction {
   subcategory: string;
   cardSuffix?: string; 
   date: string;
-  endDate?: string; // Novo campo para definir fim da recorrência
+  endDate?: string;
   billingDate?: string;
   installments?: {
     current: number;

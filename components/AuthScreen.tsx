@@ -124,7 +124,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           <div className="mt-8 pt-8 border-t border-gray-100 text-center">
             <p className="text-gray-400 text-xs font-medium">
               Acesso restrito. Não possui conta? <br/>
-              Contate o <span className="font-bold text-blue-600">Administrador (Daniel Assad)</span>.
+              Contate o <span className="font-bold text-blue-600">Administrador</span>.
             </p>
           </div>
         </div>
