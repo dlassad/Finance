@@ -41,6 +41,7 @@ interface ProcessedTransaction extends Transaction {
   displayAmount: number;
   installmentInfo: string;
   hasOverride: boolean;
+  isSpecificColor: boolean; // Nova flag
   monthKey: string;
   targetDate: Date;
 }
@@ -177,12 +178,12 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
       return false;
     }).map(t => {
       let displayAmount = t.amount;
-      let hasOverride = false;
       let installmentInfo = "";
 
-      if (t.overrides && t.overrides[monthKey] !== undefined) {
-        displayAmount = t.overrides[monthKey];
-        hasOverride = true;
+      // Verifica overrides de valor
+      const hasAmountOverride = t.overrides && t.overrides[monthKey] !== undefined;
+      if (hasAmountOverride) {
+        displayAmount = t.overrides![monthKey];
       } else if (t.installments) {
         let baseDate = t.billingDate ? new Date(t.billingDate + '-01T12:00:00') : new Date(t.date);
         displayAmount = t.amount / t.installments.total;
@@ -192,14 +193,18 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
       }
 
       // Verifica overrides de cor
-      const finalColor = t.colorOverrides?.[monthKey] || t.color;
-      const finalFontColor = t.fontColorOverrides?.[monthKey] || t.fontColor;
+      const hasColorOverride = t.colorOverrides && t.colorOverrides[monthKey] !== undefined;
+      const hasFontOverride = t.fontColorOverrides && t.fontColorOverrides[monthKey] !== undefined;
+      
+      const finalColor = hasColorOverride ? t.colorOverrides![monthKey] : t.color;
+      const finalFontColor = hasFontOverride ? t.fontColorOverrides![monthKey] : t.fontColor;
 
       return { 
           ...t, 
           displayAmount, 
           installmentInfo, 
-          hasOverride, 
+          hasOverride: hasAmountOverride || hasColorOverride || hasFontOverride, 
+          isSpecificColor: hasColorOverride,
           monthKey, 
           targetDate,
           color: finalColor, // Substitui pela cor específica do mês se houver
@@ -255,13 +260,29 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
 
   const renderTransactionItem = (t: ProcessedTransaction, tIdx: number) => {
     const dark = isDarkBg(t.color);
+
+    let containerClasses = "mx-2 my-2 p-3 rounded-2xl border transition-all group/item relative cursor-pointer ";
+    
+    // Lógica de Prioridade de Cores:
+    // 1. Se tem COR ESPECÍFICA para o mês: Usa a cor e borda padrão. (Ignora estilo de edição amarelo)
+    // 2. Se tem OVERRIDE (valor) mas SEM COR específica: Usa estilo Amarelo (Amber) para indicar edição.
+    // 3. Padrão: Usa cor global e efeitos de hover.
+
+    if (t.isSpecificColor) {
+        containerClasses += `border-gray-200 shadow-sm ${t.color}`;
+    } else if (t.hasOverride) {
+        containerClasses += "bg-amber-50 border-amber-200 shadow-sm";
+    } else {
+        containerClasses += `border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md ${t.color || ''}`;
+    }
+
+    const fontClass = t.fontColor || (dark ? 'text-white' : 'text-gray-900');
+
     return (
        <div 
          key={t.id + tIdx} 
          onClick={(e) => { e.stopPropagation(); onEditClick(t, t.monthKey, t.targetDate); }}
-         className={`mx-2 my-2 p-3 rounded-2xl border transition-all group/item relative cursor-pointer ${
-           t.hasOverride ? 'bg-amber-50 border-amber-200 shadow-sm' : 'border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md'
-         } ${t.color || ''} ${t.fontColor || (dark ? 'text-white' : 'text-gray-900')}`}
+         className={`${containerClasses} ${fontClass}`}
        >
           <div className="flex justify-between items-start gap-2 mb-1">
             <span className="text-[10px] font-black uppercase leading-tight flex-1">

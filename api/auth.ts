@@ -47,11 +47,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!user) {
         return res.status(401).json({ message: 'E-mail ou senha incorretos' });
       }
+      
+      // Verifica se é admin: por email (case insensitive) OU pelo nome "Daniel Assad"
+      const isAdmin = (user.email.toLowerCase() === MASTER_EMAIL.toLowerCase()) || 
+                      (user.name === 'Daniel Assad');
+
       return res.status(200).json({ 
         id: user._id.toString(), 
         name: user.name, 
         email: user.email,
-        isAdmin: user.email === MASTER_EMAIL
+        isAdmin: isAdmin
       });
     } 
     
@@ -94,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // --- LEGACY REGISTER (Mantido apenas para permitir que o Master se cadastre se o banco estiver vazio) ---
     else if (action === 'register') {
       // Bloqueia auto-cadastro público, exceto se for o Master Email tentando se registrar
-      if (email !== MASTER_EMAIL) {
+      if (email.toLowerCase() !== MASTER_EMAIL.toLowerCase()) {
          return res.status(403).json({ message: 'Auto-cadastro desabilitado. Contate o Administrador.' });
       }
 
