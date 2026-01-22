@@ -55,6 +55,9 @@ const App: React.FC = () => {
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Estado para seleção múltipla na tabela
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
+
   // Carregar dados da API
   useEffect(() => {
     async function loadData() {
@@ -216,6 +219,32 @@ const App: React.FC = () => {
     setAdjustingTransaction({ t: transaction, month: monthKey });
   };
 
+  // Funções de Seleção Múltipla
+  const handleToggleSelect = (id: string) => {
+    const newSelected = new Set(selectedTransactionIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedTransactionIds(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedTransactionIds.size === transactions.length) {
+      setSelectedTransactionIds(new Set());
+    } else {
+      setSelectedTransactionIds(new Set(transactions.map(t => t.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (window.confirm(`Tem certeza que deseja excluir ${selectedTransactionIds.size} itens selecionados?`)) {
+      setTransactions(prev => prev.filter(t => !selectedTransactionIds.has(t.id)));
+      setSelectedTransactionIds(new Set());
+    }
+  };
+
   if (!currentUser) {
     return <AuthScreen onLogin={handleLogin} />;
   }
@@ -311,8 +340,18 @@ const App: React.FC = () => {
                   transactions={transactions} 
                   onDelete={(id) => { 
                     setTransactions(prev => prev.filter(t => t.id !== id));
+                    // Remover da seleção se estiver selecionado
+                    if (selectedTransactionIds.has(id)) {
+                      const newSet = new Set(selectedTransactionIds);
+                      newSet.delete(id);
+                      setSelectedTransactionIds(newSet);
+                    }
                   }} 
-                  onEdit={handleEditClick} 
+                  onEdit={handleEditClick}
+                  selectedIds={selectedTransactionIds}
+                  onToggleSelect={handleToggleSelect}
+                  onSelectAll={handleSelectAll}
+                  onBulkDelete={handleBulkDelete}
                 />
               </div>
             </>
