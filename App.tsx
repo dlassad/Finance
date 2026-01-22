@@ -29,6 +29,7 @@ import { ReconciliationModal } from './components/ReconciliationModal';
 import { SettingsScreen } from './components/SettingsScreen';
 import { AdjustmentModal } from './components/AdjustmentModal';
 import { AuthScreen } from './components/AuthScreen';
+import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE } from './constants';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -64,9 +65,20 @@ const App: React.FC = () => {
           if (res.ok) {
             const data = await res.json();
             setTransactions(data.transactions || []);
-            setCategories(data.categories || {});
+            setCategories(data.categories || CATEGORY_STRUCTURE);
             setPaymentMethods(data.paymentMethods || []);
             setDataLoaded(true);
+          } else if (res.status === 404) {
+            // Se não encontrou dados, inicializa com padrão para permitir salvar depois
+            console.log("Dados não encontrados, inicializando novo perfil...");
+            setTransactions(INITIAL_TRANSACTIONS);
+            setCategories(CATEGORY_STRUCTURE);
+            setPaymentMethods([
+                { name: 'DINHEIRO', isCreditCard: false },
+                { name: 'PIX', isCreditCard: false },
+                ...CARD_SUFFIXES.map(c => ({ name: c, isCreditCard: true }))
+            ]);
+            setDataLoaded(true); // Permite salvar
           }
         } catch (error) {
           console.error("Erro ao carregar dados", error);
