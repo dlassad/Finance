@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import connectToDatabase from '../lib/mongodb';
 import { UserModel, UserDataModel } from '../lib/models';
-import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE, MASTER_EMAIL } from '../constants';
+import { INITIAL_TRANSACTIONS, CATEGORY_STRUCTURE, MASTER_EMAIL } from '../constants';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Configuração CORS
@@ -73,16 +73,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         password
       });
 
-      // Criação dos dados iniciais padrão
+      // Criação dos dados iniciais padrão (LIMPO para novos usuários)
       try {
         await UserDataModel.create({
           userId: newUser._id.toString(),
-          transactions: INITIAL_TRANSACTIONS,
-          categories: CATEGORY_STRUCTURE,
+          transactions: [], // Começa vazio
+          categories: CATEGORY_STRUCTURE, // Mantém categorias padrão
           paymentMethods: [
             { name: 'DINHEIRO', isCreditCard: false },
-            { name: 'PIX', isCreditCard: false },
-            ...CARD_SUFFIXES.map(c => ({ name: c, isCreditCard: true }))
+            { name: 'PIX', isCreditCard: false }
+            // Removido CARD_SUFFIXES para não injetar cartões do Master
           ]
         });
       } catch (dataError) {
@@ -120,12 +120,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         await UserDataModel.create({
           userId: newUser._id.toString(),
-          transactions: INITIAL_TRANSACTIONS,
+          transactions: [], 
           categories: CATEGORY_STRUCTURE,
           paymentMethods: [
             { name: 'DINHEIRO', isCreditCard: false },
-            { name: 'PIX', isCreditCard: false },
-            ...CARD_SUFFIXES.map(c => ({ name: c, isCreditCard: true }))
+            { name: 'PIX', isCreditCard: false }
           ]
         });
       } catch (dataError) {

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar, Edit3, Save, X, UserPlus, ShieldCheck, Copy, Check, RefreshCw } from 'lucide-react';
 import { CategoryStructure, PaymentMethod, User } from '../types';
-import { CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
+import { CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
 
 interface SettingsScreenProps {
   currentUser: User;
@@ -178,10 +178,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleReset = () => {
     if (confirm('Deseja restaurar as categorias e formas de pagamento para o padrão inicial?')) {
+      // Estado LIMPO (sem cartões específicos)
       const initialMethods: PaymentMethod[] = [
         { name: 'DINHEIRO', isCreditCard: false },
-        { name: 'PIX', isCreditCard: false },
-        ...DEFAULT_CARDS.map(c => ({ name: c, isCreditCard: true }))
+        { name: 'PIX', isCreditCard: false }
       ];
       setPaymentMethods(initialMethods);
       setCategories(DEFAULT_CATEGORIES);

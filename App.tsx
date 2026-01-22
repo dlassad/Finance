@@ -75,12 +75,13 @@ const App: React.FC = () => {
             setPaymentMethods(data.paymentMethods || []);
             setDataLoaded(true);
           } else if (res.status === 404) {
-            setTransactions(INITIAL_TRANSACTIONS);
+            // Fallback para novo usuário (sem dados no DB) -> Estado Limpo
+            setTransactions([]); // Sem transações
             setCategories(CATEGORY_STRUCTURE);
             setPaymentMethods([
                 { name: 'DINHEIRO', isCreditCard: false },
-                { name: 'PIX', isCreditCard: false },
-                ...CARD_SUFFIXES.map(c => ({ name: c, isCreditCard: true }))
+                { name: 'PIX', isCreditCard: false }
+                // Não adiciona CARD_SUFFIXES aqui
             ]);
             setDataLoaded(true);
           }
