@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EntryType, Transaction, CategoryStructure, PaymentMethod } from '../types';
 import { X, Palette, Type as FontIcon, CreditCard, Tag, Calendar, Check } from 'lucide-react';
+import { calculateDefaultBillingDate } from '../utils';
 
 interface AddTransactionModalProps {
   onClose: () => void;
@@ -57,6 +58,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [color, setColor] = useState('bg-white border-gray-200');
   const [fontColor, setFontColor] = useState('text-gray-900');
   
+  // Novo estado de Data da Compra
+  const [date, setDate] = useState(() => {
+    return initialData?.date 
+      ? initialData.date.split('T')[0] 
+      : new Date().toISOString().split('T')[0];
+  });
+
   const [billingMonth, setBillingMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -76,6 +84,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       setInstallmentsTotal(initialData.installments?.total.toString() || '');
       setColor(initialData.color || 'bg-white border-gray-200');
       setFontColor(initialData.fontColor || 'text-gray-900');
+      setDate(initialData.date.split('T')[0]);
       if (initialData.billingDate) setBillingMonth(initialData.billingDate);
     }
   }, [initialData]);
@@ -86,6 +95,24 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         setSubcategory(subs[0] || '');
     }
   }, [category, categoryStructure]);
+
+  // Efeito para calcular o Mês de Fatura baseado no Melhor Dia
+  useEffect(() => {
+    const method = paymentOptions.find(m => m.name === cardSuffix);
+    if (method && method.isCreditCard) {
+      // Evita sobrescrever se estiver editando e os dados não mudaram
+      const isInitialLoad = initialData && 
+                            cardSuffix === initialData.cardSuffix && 
+                            date === initialData.date.split('T')[0];
+
+      if (!isInitialLoad) {
+        // Usa a data selecionada no input (12:00 para evitar fuso horário voltando o dia)
+        const purchaseDate = new Date(date + 'T12:00:00');
+        const calculatedBilling = calculateDefaultBillingDate(purchaseDate, method.bestDay);
+        setBillingMonth(calculatedBilling);
+      }
+    }
+  }, [cardSuffix, date, paymentOptions]);
 
   const evaluateExpression = (val: string): string => {
     if (!val) return "";
@@ -122,7 +149,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       subcategory,
       cardSuffix: cardSuffix || undefined,
       billingDate: (cardSuffix && selectedMethodIsCard) ? billingMonth : undefined,
-      date: initialData?.date || new Date().toISOString(),
+      date: date, // Salva a data selecionada
       isRecurring,
       color,
       fontColor,
@@ -176,6 +203,18 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                   </button>
                 </div>
               </div>
+              
+              <div className="w-full sm:w-1/3">
+                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Data</label>
+                 <input 
+                    type="date" 
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold text-gray-800 text-sm"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                 />
+              </div>
+
               <div className="flex-1">
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Descrição</label>
                 <input autoFocus className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold text-gray-800" placeholder="EX: SUPERMERCADO" value={description} onChange={(e) => setDescription(e.target.value)} required />
@@ -223,9 +262,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               )}
 
               {cardSuffix && selectedMethodIsCard && (
-                  <div className="flex items-center gap-3 bg-white px-4 py-1.5 rounded-xl border border-gray-200">
+                  <div className="flex items-center gap-3 bg-white px-4 py-1.5 rounded-xl border border-gray-200 flex-1">
                       <Calendar size={14} className="text-gray-400" />
-                      <input type="month" className="bg-transparent text-[11px] font-black text-gray-700 outline-none cursor-pointer" value={billingMonth} onChange={(e) => setBillingMonth(e.target.value)} />
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Mês Fatura</span>
+                        <input type="month" className="bg-transparent text-[11px] font-black text-gray-700 outline-none cursor-pointer w-full" value={billingMonth} onChange={(e) => setBillingMonth(e.target.value)} />
+                      </div>
                   </div>
               )}
             </div>

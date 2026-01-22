@@ -13,6 +13,37 @@ export const getMonthYear = (date: string | Date) => {
   return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).toUpperCase();
 };
 
+export const calculateBusinessDueDate = (targetMonthDate: Date, dueDay: number): Date => {
+  // Cria a data base no ano/mês selecionado com o dia de vencimento configurado
+  const date = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), dueDay);
+  
+  const dayOfWeek = date.getDay(); // 0 = Domingo, 6 = Sábado
+
+  // Se for Domingo (0), adiciona 1 dia (Segunda)
+  if (dayOfWeek === 0) {
+    date.setDate(date.getDate() + 1);
+  }
+  // Se for Sábado (6), adiciona 2 dias (Segunda)
+  else if (dayOfWeek === 6) {
+    date.setDate(date.getDate() + 2);
+  }
+  
+  return date;
+};
+
+export const calculateDefaultBillingDate = (referenceDate: Date, bestDay?: number): string => {
+  // Padrão: Compra no mês X, paga no mês X+1 (Fatura seguinte)
+  // Ajuste o objeto Date para o mês seguinte
+  let targetDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1);
+
+  // Regra do Melhor Dia: Se o dia da compra for >= melhor dia, a fatura só vem no outro mês (X+2)
+  if (bestDay && referenceDate.getDate() >= bestDay) {
+    targetDate.setMonth(targetDate.getMonth() + 1);
+  }
+
+  return `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+};
+
 export const calculateProjections = (
   transactions: Transaction[],
   startBalance: number,

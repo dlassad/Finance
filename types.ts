@@ -13,6 +13,8 @@ export interface User {
 export interface PaymentMethod {
   name: string;
   isCreditCard: boolean;
+  dueDay?: number;
+  bestDay?: number;
 }
 
 export interface Transaction {
@@ -49,6 +51,7 @@ export interface CardGroup {
   suffix: string;
   total: number;
   transactions: Transaction[];
+  paymentMethod?: PaymentMethod;
 }
 
 export interface CategorySummary {

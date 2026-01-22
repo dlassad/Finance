@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 import { Transaction, EntryType, CardGroup, CategoryStructure, PaymentMethod, User } from './types';
-import { calculateProjections, getMonthYear, formatCurrency } from './utils';
+import { calculateProjections, getMonthYear, formatCurrency, calculateBusinessDueDate } from './utils';
 import { SummaryCard } from './components/SummaryCard';
 import { TransactionTable } from './components/TransactionTable';
 import { AddTransactionModal } from './components/AddTransactionModal';
@@ -184,20 +184,28 @@ const App: React.FC = () => {
       }
       return false;
     });
+    
     monthlyCardTransactions.forEach(t => {
       const suffix = t.cardSuffix!;
       if (!groups[suffix]) groups[suffix] = [];
       groups[suffix].push(t);
     });
-    return Object.entries(groups).map(([suffix, txs]) => ({
-      suffix,
-      transactions: txs,
-      total: txs.reduce((sum, t) => {
-        if (t.overrides && t.overrides[targetMonthKey] !== undefined) return sum + Math.abs(t.overrides[targetMonthKey]);
-        const installmentAmount = t.installments ? Math.abs(t.amount / t.installments.total) : Math.abs(t.amount);
-        return sum + installmentAmount;
-      }, 0)
-    })).sort((a, b) => b.total - a.total);
+
+    return Object.entries(groups).map(([suffix, txs]) => {
+      // Encontrar o método de pagamento para obter os dados de vencimento
+      const paymentMethod = paymentMethods.find(pm => pm.name === suffix);
+      
+      return {
+        suffix,
+        transactions: txs,
+        paymentMethod,
+        total: txs.reduce((sum, t) => {
+          if (t.overrides && t.overrides[targetMonthKey] !== undefined) return sum + Math.abs(t.overrides[targetMonthKey]);
+          const installmentAmount = t.installments ? Math.abs(t.amount / t.installments.total) : Math.abs(t.amount);
+          return sum + installmentAmount;
+        }, 0)
+      };
+    }).sort((a, b) => b.total - a.total);
   }, [transactions, selectedCardDate, paymentMethods]);
 
   const handleSaveTransaction = (data: Omit<Transaction, 'id'> | Transaction) => {
@@ -383,36 +391,51 @@ const App: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {cardSummaries.map((group) => (
-                  <div key={group.suffix} className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm border-b-4 border-b-gray-900 flex flex-col min-h-[400px]">
-                    <div className="flex items-center space-x-4 mb-8">
-                        <div className="bg-gray-900 p-3 rounded-2xl text-white"><CreditCardIcon size={24} /></div>
-                        <h3 className="font-black text-xl text-gray-800 uppercase tracking-tighter">FINANCE {group.suffix}</h3>
-                    </div>
-                    <div className="mb-6 pb-6 border-b border-gray-50">
-                        <span className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Fatura {getMonthYear(selectedCardDate)}</span>
-                        <span className="text-3xl font-black text-red-600">{formatCurrency(group.total)}</span>
-                    </div>
-                    <div className="flex-1 mb-8 overflow-hidden flex flex-col">
-                      <div className="space-y-3 overflow-y-auto max-h-64 pr-2 custom-scrollbar">
-                        {group.transactions.map((t, idx) => (
-                          <div key={idx} className="flex justify-between items-center group/tx">
-                            <div className="flex flex-col">
-                              <span className="text-[11px] font-bold text-gray-700">{t.description}</span>
-                              <span className="text-[9px] text-gray-400 font-medium">{t.category}</span>
-                            </div>
-                            <span className="text-xs font-black text-gray-800">{formatCurrency(t.amount / (t.installments?.total || 1))}</span>
+                {cardSummaries.map((group) => {
+                  let dueDateDisplay = "N/A";
+                  if (group.paymentMethod?.dueDay) {
+                    const businessDate = calculateBusinessDueDate(selectedCardDate, group.paymentMethod.dueDay);
+                    dueDateDisplay = businessDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                  }
+
+                  return (
+                    <div key={group.suffix} className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm border-b-4 border-b-gray-900 flex flex-col min-h-[400px]">
+                      <div className="flex items-center space-x-4 mb-8">
+                          <div className="bg-gray-900 p-3 rounded-2xl text-white"><CreditCardIcon size={24} /></div>
+                          <div>
+                            <h3 className="font-black text-xl text-gray-800 uppercase tracking-tighter">{group.suffix}</h3>
+                            {group.paymentMethod?.dueDay && (
+                                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                                    Vence: {dueDateDisplay}
+                                </span>
+                            )}
                           </div>
-                        ))}
+                      </div>
+                      <div className="mb-6 pb-6 border-b border-gray-50">
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Fatura {getMonthYear(selectedCardDate)}</span>
+                          <span className="text-3xl font-black text-red-600">{formatCurrency(group.total)}</span>
+                      </div>
+                      <div className="flex-1 mb-8 overflow-hidden flex flex-col">
+                        <div className="space-y-3 overflow-y-auto max-h-64 pr-2 custom-scrollbar">
+                          {group.transactions.map((t, idx) => (
+                            <div key={idx} className="flex justify-between items-center group/tx">
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-bold text-gray-700">{t.description}</span>
+                                <span className="text-[9px] text-gray-400 font-medium">{t.category}</span>
+                              </div>
+                              <span className="text-xs font-black text-gray-800">{formatCurrency(t.amount / (t.installments?.total || 1))}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-auto pt-6 border-t border-dashed border-gray-200">
+                        <button onClick={() => setReconcilingCard(group.suffix)} className="w-full py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-black text-gray-700 border border-gray-100 flex items-center justify-center gap-2">
+                          <Activity size={16} /> CONFRONTAR FATURA
+                        </button>
                       </div>
                     </div>
-                    <div className="mt-auto pt-6 border-t border-dashed border-gray-200">
-                      <button onClick={() => setReconcilingCard(group.suffix)} className="w-full py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm font-black text-gray-700 border border-gray-100 flex items-center justify-center gap-2">
-                        <Activity size={16} /> CONFRONTAR FATURA
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown } from 'lucide-react';
+import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
 import { CategoryStructure, PaymentMethod } from '../types';
 import { CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
 
@@ -18,6 +18,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 }) => {
   const [newMethodName, setNewMethodName] = useState('');
   const [newMethodIsCard, setNewMethodIsCard] = useState(false);
+  const [newMethodDueDay, setNewMethodDueDay] = useState('');
+  const [newMethodBestDay, setNewMethodBestDay] = useState('');
+
   const [newCategory, setNewCategory] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [newSubCategory, setNewSubCategory] = useState('');
@@ -26,9 +29,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleAddMethod = () => {
     if (newMethodName && !paymentMethods.find(m => m.name.toUpperCase() === newMethodName.toUpperCase())) {
-      setPaymentMethods([...paymentMethods, { name: newMethodName.toUpperCase(), isCreditCard: newMethodIsCard }]);
+      const newMethod: PaymentMethod = { 
+        name: newMethodName.toUpperCase(), 
+        isCreditCard: newMethodIsCard 
+      };
+
+      if (newMethodIsCard) {
+        if (newMethodDueDay) newMethod.dueDay = parseInt(newMethodDueDay);
+        if (newMethodBestDay) newMethod.bestDay = parseInt(newMethodBestDay);
+      }
+
+      setPaymentMethods([...paymentMethods, newMethod]);
       setNewMethodName('');
       setNewMethodIsCard(false);
+      setNewMethodDueDay('');
+      setNewMethodBestDay('');
     }
   };
 
@@ -166,6 +181,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Plus size={20} />
               </button>
             </div>
+            
             <div className="flex items-center gap-3 cursor-pointer group">
                 <button 
                     type="button"
@@ -176,6 +192,33 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </button>
                 <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest group-hover:text-blue-600">Possui Fatura (Cartão de Crédito)</span>
             </div>
+
+            {newMethodIsCard && (
+              <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-200">
+                <div>
+                   <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Dia Vencimento</label>
+                   <input 
+                    type="number" 
+                    min="1" max="31"
+                    placeholder="Ex: 10"
+                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:border-blue-500 outline-none"
+                    value={newMethodDueDay}
+                    onChange={(e) => setNewMethodDueDay(e.target.value)}
+                   />
+                </div>
+                <div>
+                   <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Melhor Dia</label>
+                   <input 
+                    type="number" 
+                    min="1" max="31"
+                    placeholder="Ex: 3"
+                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:border-blue-500 outline-none"
+                    value={newMethodBestDay}
+                    onChange={(e) => setNewMethodBestDay(e.target.value)}
+                   />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -191,9 +234,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     </button>
                     <div>
                         <p className="text-sm font-black text-gray-800 uppercase tracking-tighter">{method.name}</p>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                            {method.isCreditCard ? 'Cartão de Crédito' : 'Pagamento Imediato'}
-                        </p>
+                        <div className="flex gap-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                            <span>{method.isCreditCard ? 'Cartão de Crédito' : 'Pagamento Imediato'}</span>
+                            {method.isCreditCard && method.dueDay && (
+                              <span className="flex items-center gap-1 text-blue-500"><Calendar size={10} /> Vence dia {method.dueDay}</span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
