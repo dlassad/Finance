@@ -33,10 +33,8 @@ import { AuthScreen } from './components/AuthScreen';
 import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE } from './constants';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('financeview_session');
-    return saved ? JSON.parse(saved) : null;
-  });
+  // Removido o uso de localStorage para iniciar o estado
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -139,12 +137,12 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('financeview_session', JSON.stringify(user));
+    // Removido salvamento em localStorage
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('financeview_session');
+    // Removido remoção de localStorage pois não salvamos mais lá
     setDataLoaded(false);
   };
 
