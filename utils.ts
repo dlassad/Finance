@@ -32,12 +32,20 @@ export const calculateBusinessDueDate = (targetMonthDate: Date, dueDay: number):
 };
 
 export const calculateDefaultBillingDate = (referenceDate: Date, bestDay?: number): string => {
-  // Padrão: Compra no mês X, paga no mês X+1 (Fatura seguinte)
-  // Ajuste o objeto Date para o mês seguinte
-  let targetDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1);
+  // Normaliza para o dia 1 para evitar problemas de virada de mês (ex: 30 de jan + 1 mês em ano não bissexto)
+  let targetDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
 
-  // Regra do Melhor Dia: Se o dia da compra for >= melhor dia, a fatura só vem no outro mês (X+2)
-  if (bestDay && referenceDate.getDate() >= bestDay) {
+  if (bestDay) {
+    // Lógica do Melhor Dia:
+    // Se a compra foi feita no Melhor Dia ou depois, a fatura vira para o próximo mês.
+    // Ex: Compra 22/01, Melhor Dia 02. 22 >= 02 -> Fatura Fev.
+    // Ex: Compra 01/01, Melhor Dia 02. 01 < 02 -> Fatura Jan.
+    if (referenceDate.getDate() >= bestDay) {
+      targetDate.setMonth(targetDate.getMonth() + 1);
+    }
+    // Se for menor, mantém no mês atual (targetDate não muda mês)
+  } else {
+    // Padrão sem melhor dia definido: Compra no mês X, paga no mês X+1
     targetDate.setMonth(targetDate.getMonth() + 1);
   }
 
