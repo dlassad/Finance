@@ -3,7 +3,7 @@ import connectToDatabase from '../lib/mongodb';
 import { UserDataModel } from '../lib/models';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Configuração CORS (Crucial para permitir requisições do navegador)
+  // CORS Setup
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -12,7 +12,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // Resposta imediata para preflight OPTIONS
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -20,46 +19,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await connectToDatabase();
     
-    // GET: Recuperar dados
+    // --- GET: RECUPERAR DADOS ---
     if (req.method === 'GET') {
       const { userId } = req.query;
       
-      if (!userId) return res.status(400).json({ message: 'UserId required' });
+      if (!userId) {
+        return res.status(400).json({ message: 'UserId is required' });
+      }
 
+      console.log(`[API] Buscando dados para userId: ${userId}`);
       const data = await UserDataModel.findOne({ userId });
       
       if (!data) {
-        // Se não achar dados, retorna 404 mas com corpo vazio para o front tratar
+        console.log(`[API] Dados não encontrados para userId: ${userId}`);
         return res.status(404).json({ message: 'Dados não encontrados' });
       }
 
       return res.status(200).json(data);
     }
 
-    // POST: Salvar dados
+    // --- POST: SALVAR DADOS ---
     if (req.method === 'POST') {
-      const { userId, transactions, categories, paymentMethods } = req.body;
+      // Parsing seguro do body (caso venha como string)
+      let body = req.body;
+      if (typeof body === 'string') {
+        try {
+          body = JSON.parse(body);
+        } catch (e) {
+          console.error('[API] Erro ao fazer parse do body:', e);
+          return res.status(400).json({ message: 'Invalid JSON body' });
+        }
+      }
 
-      if (!userId) return res.status(400).json({ message: 'UserId required' });
+      const { userId, transactions, categories, paymentMethods } = body;
 
-      await UserDataModel.findOneAndUpdate(
+      if (!userId) {
+        console.error('[API] Tentativa de salvar sem userId');
+        return res.status(400).json({ message: 'UserId required for saving' });
+      }
+
+      console.log(`[API] Salvando dados para userId: ${userId} | Transações: ${transactions?.length}`);
+
+      // upsert: true -> cria se não existir, atualiza se existir
+      const result = await UserDataModel.findOneAndUpdate(
         { userId },
         { 
-          transactions, 
-          categories, 
-          paymentMethods,
-          updatedAt: new Date()
+          $set: {
+            transactions: transactions || [],
+            categories: categories || {},
+            paymentMethods: paymentMethods || [],
+            updatedAt: new Date()
+          }
         },
-        { upsert: true, new: true } // Cria se não existir
+        { upsert: true, new: true, runValidators: false } // runValidators: false ajuda a evitar erros de schema estritos
       );
 
-      return res.status(200).json({ success: true });
+      console.log('[API] Dados salvos com sucesso.');
+      return res.status(200).json({ success: true, id: result._id });
     }
 
     return res.status(405).json({ message: 'Method not allowed' });
 
   } catch (error: any) {
-    console.error("Erro na API de Dados:", error);
-    return res.status(500).json({ message: 'Erro interno', error: error.message });
+    console.error("Erro CRÍTICO na API de Dados:", error);
+    return res.status(500).json({ 
+      message: 'Erro interno ao processar dados', 
+      error: error.message 
+    });
   }
 }

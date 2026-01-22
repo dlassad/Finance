@@ -16,7 +16,8 @@ import {
   LogOut,
   User as UserIcon,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 
 import { Transaction, EntryType, CardGroup, CategoryStructure, PaymentMethod, User } from './types';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false); // Novo estado para erro de salvamento
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -61,16 +63,18 @@ const App: React.FC = () => {
       if (currentUser) {
         setIsLoading(true);
         try {
+          console.log("Carregando dados para:", currentUser.id);
           const res = await fetch(`/api/data?userId=${currentUser.id}`);
+          
           if (res.ok) {
             const data = await res.json();
+            console.log("Dados carregados com sucesso:", data);
             setTransactions(data.transactions || []);
             setCategories(data.categories || CATEGORY_STRUCTURE);
             setPaymentMethods(data.paymentMethods || []);
             setDataLoaded(true);
           } else if (res.status === 404) {
-            // Se não encontrou dados, inicializa com padrão para permitir salvar depois
-            console.log("Dados não encontrados, inicializando novo perfil...");
+            console.log("Dados não encontrados (404), inicializando novo perfil...");
             setTransactions(INITIAL_TRANSACTIONS);
             setCategories(CATEGORY_STRUCTURE);
             setPaymentMethods([
@@ -78,10 +82,12 @@ const App: React.FC = () => {
                 { name: 'PIX', isCreditCard: false },
                 ...CARD_SUFFIXES.map(c => ({ name: c, isCreditCard: true }))
             ]);
-            setDataLoaded(true); // Permite salvar
+            setDataLoaded(true); // Permite salvar imediatamente
+          } else {
+            console.error("Erro ao carregar dados. Status:", res.status);
           }
         } catch (error) {
-          console.error("Erro ao carregar dados", error);
+          console.error("Erro de rede ao carregar dados", error);
         } finally {
           setIsLoading(false);
         }
@@ -93,14 +99,16 @@ const App: React.FC = () => {
     loadData();
   }, [currentUser]);
 
-  // Salvar dados na API (Debounce manual via effect)
+  // Salvar dados na API (Debounce manual)
   useEffect(() => {
     if (!currentUser || !dataLoaded) return;
 
     const timeoutId = setTimeout(async () => {
       setIsSaving(true);
+      setSaveError(false);
       try {
-        await fetch('/api/data', {
+        console.log("Iniciando salvamento automático...");
+        const res = await fetch('/api/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -110,12 +118,21 @@ const App: React.FC = () => {
             paymentMethods
           })
         });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error("Erro ao salvar dados:", errText);
+            setSaveError(true);
+        } else {
+            console.log("Dados salvos com sucesso.");
+        }
       } catch (error) {
-        console.error("Erro ao salvar dados", error);
+        console.error("Erro de rede ao salvar dados", error);
+        setSaveError(true);
       } finally {
         setIsSaving(false);
       }
-    }, 1000); // Salva 1 segundo após a última alteração
+    }, 1500);
 
     return () => clearTimeout(timeoutId);
   }, [transactions, paymentMethods, categories, currentUser, dataLoaded]);
@@ -235,10 +252,10 @@ const App: React.FC = () => {
           </nav>
           
           <div className="mt-auto space-y-4">
-            <div className="p-4 bg-gray-50 rounded-3xl border border-gray-100">
+            <div className={`p-4 rounded-3xl border border-gray-100 transition-colors ${saveError ? 'bg-red-50 border-red-200' : 'bg-gray-50'}`}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="bg-blue-100 p-2 rounded-xl text-blue-600">
-                  <UserIcon size={16} />
+                <div className={`p-2 rounded-xl ${saveError ? 'bg-red-200 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                  {saveError ? <AlertTriangle size={16} /> : <UserIcon size={16} />}
                 </div>
                 <div className="overflow-hidden flex-1">
                   <p className="text-[11px] font-black text-gray-800 truncate">{currentUser.name}</p>
@@ -246,6 +263,13 @@ const App: React.FC = () => {
                 </div>
                 {isSaving && <RefreshCw size={14} className="animate-spin text-blue-500" />}
               </div>
+              
+              {saveError && (
+                <p className="text-[9px] font-bold text-red-500 mb-2 text-center">
+                  Erro ao salvar dados. Verifique sua conexão.
+                </p>
+              )}
+
               <button 
                 onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 py-2 bg-white text-red-500 text-[10px] font-black uppercase tracking-widest rounded-xl border border-red-100 hover:bg-red-50 transition-colors"
