@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown } from 'lucide-react';
 import { CategoryStructure, PaymentMethod } from '../types';
 import { CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
 
@@ -23,6 +22,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [newSubCategory, setNewSubCategory] = useState('');
 
+  // --- Lógica de Formas de Pagamento ---
+
   const handleAddMethod = () => {
     if (newMethodName && !paymentMethods.find(m => m.name.toUpperCase() === newMethodName.toUpperCase())) {
       setPaymentMethods([...paymentMethods, { name: newMethodName.toUpperCase(), isCreditCard: newMethodIsCard }]);
@@ -39,6 +40,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setPaymentMethods(paymentMethods.map(m => m.name === name ? { ...m, isCreditCard: !m.isCreditCard } : m));
   };
 
+  const movePaymentMethod = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === paymentMethods.length - 1)) return;
+    
+    const newMethods = [...paymentMethods];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    [newMethods[index], newMethods[swapIndex]] = [newMethods[swapIndex], newMethods[index]];
+    
+    setPaymentMethods(newMethods);
+  };
+
+  // --- Lógica de Categorias ---
+
   const handleAddCategory = () => {
     if (newCategory && !categories[newCategory]) {
       setCategories({ ...categories, [newCategory]: [] });
@@ -50,6 +63,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const { [cat]: _, ...rest } = categories;
     setCategories(rest);
   };
+
+  const moveCategory = (cat: string, direction: 'up' | 'down') => {
+    const keys = Object.keys(categories);
+    const index = keys.indexOf(cat);
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === keys.length - 1)) return;
+
+    const newKeys = [...keys];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    [newKeys[index], newKeys[swapIndex]] = [newKeys[swapIndex], newKeys[index]];
+
+    // Reconstrói o objeto na nova ordem
+    const newCategories: CategoryStructure = {};
+    newKeys.forEach(key => {
+        newCategories[key] = categories[key];
+    });
+    setCategories(newCategories);
+  };
+
+  // --- Lógica de Subcategorias ---
 
   const handleAddSubCategory = (cat: string) => {
     if (newSubCategory && !categories[cat].includes(newSubCategory)) {
@@ -65,6 +97,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setCategories({
       ...categories,
       [cat]: categories[cat].filter(s => s !== sub)
+    });
+  };
+
+  const moveSubCategory = (cat: string, subIndex: number, direction: 'up' | 'down') => {
+    const currentSubs = categories[cat];
+    if ((direction === 'up' && subIndex === 0) || (direction === 'down' && subIndex === currentSubs.length - 1)) return;
+
+    const newSubs = [...currentSubs];
+    const swapIndex = direction === 'up' ? subIndex - 1 : subIndex + 1;
+    [newSubs[subIndex], newSubs[swapIndex]] = [newSubs[swapIndex], newSubs[subIndex]];
+
+    setCategories({
+        ...categories,
+        [cat]: newSubs
     });
   };
 
@@ -133,8 +179,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
 
           <div className="space-y-2">
-            {paymentMethods.map(method => (
-              <div key={method.name} className="flex items-center justify-between bg-white border border-gray-100 p-4 rounded-2xl hover:border-blue-200 transition-all group shadow-sm">
+            {paymentMethods.map((method, idx) => (
+              <div key={method.name} className="flex items-center justify-between bg-white border border-gray-100 p-3 rounded-2xl hover:border-blue-200 transition-all group shadow-sm">
                 <div className="flex items-center gap-4">
                     <button 
                         onClick={() => handleToggleCardType(method.name)}
@@ -150,12 +196,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         </p>
                     </div>
                 </div>
-                <button 
-                  onClick={() => handleRemoveMethod(method.name)}
-                  className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <div className="flex flex-col gap-1 mr-2">
+                    {idx > 0 && (
+                        <button onClick={() => movePaymentMethod(idx, 'up')} className="p-1 text-gray-300 hover:text-blue-600 transition-colors">
+                            <ArrowUp size={12} />
+                        </button>
+                    )}
+                    {idx < paymentMethods.length - 1 && (
+                        <button onClick={() => movePaymentMethod(idx, 'down')} className="p-1 text-gray-300 hover:text-blue-600 transition-colors">
+                            <ArrowDown size={12} />
+                        </button>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => handleRemoveMethod(method.name)}
+                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -186,17 +246,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {Object.keys(categories).map(cat => (
-              <div key={cat} className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+            {Object.keys(categories).map((cat, idx, arr) => (
+              <div key={cat} className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white">
                 <div 
-                  className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${expandedCategory === cat ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${expandedCategory === cat ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                   onClick={() => setExpandedCategory(expandedCategory === cat ? null : cat)}
                 >
                   <div className="flex items-center gap-2">
                     {expandedCategory === cat ? <ChevronDown size={16} className="text-blue-600" /> : <ChevronRight size={16} className="text-gray-400" />}
                     <span className="text-sm font-bold text-gray-800">{cat}</span>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); handleRemoveCategory(cat); }} className="p-2 text-gray-300 hover:text-red-500"><Trash2 size={16} /></button>
+                  <div className="flex items-center gap-1">
+                      <div className="flex flex-col gap-1 mr-2" onClick={(e) => e.stopPropagation()}>
+                        {idx > 0 && (
+                            <button onClick={() => moveCategory(cat, 'up')} className="p-0.5 text-gray-300 hover:text-blue-600 transition-colors">
+                                <ArrowUp size={12} />
+                            </button>
+                        )}
+                        {idx < arr.length - 1 && (
+                            <button onClick={() => moveCategory(cat, 'down')} className="p-0.5 text-gray-300 hover:text-blue-600 transition-colors">
+                                <ArrowDown size={12} />
+                            </button>
+                        )}
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); handleRemoveCategory(cat); }} className="p-2 text-gray-300 hover:text-red-500"><Trash2 size={16} /></button>
+                  </div>
                 </div>
                 {expandedCategory === cat && (
                   <div className="p-4 bg-white border-t border-gray-50 space-y-4">
@@ -204,10 +278,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                       <input type="text" placeholder="Nova Subcategoria..." className="flex-1 px-3 py-2 bg-gray-50 border-none rounded-lg text-xs outline-none" value={newSubCategory} onChange={(e) => setNewSubCategory(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAddSubCategory(cat)} />
                       <button onClick={() => handleAddSubCategory(cat)} className="bg-gray-900 text-white p-2 rounded-lg"><Plus size={14} /></button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {categories[cat].map(sub => (
-                        <div key={sub} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-100">
-                          {sub} <button onClick={() => handleRemoveSubCategory(cat, sub)} className="hover:text-red-500"><Trash2 size={10} /></button>
+                    <div className="space-y-2">
+                      {categories[cat].map((sub, subIdx) => (
+                        <div key={sub} className="flex items-center justify-between bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-[11px] font-bold border border-blue-100">
+                          <span>{sub}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1">
+                                {subIdx > 0 && (
+                                    <button onClick={() => moveSubCategory(cat, subIdx, 'up')} className="text-blue-300 hover:text-blue-600"><ArrowUp size={12} /></button>
+                                )}
+                                {subIdx < categories[cat].length - 1 && (
+                                    <button onClick={() => moveSubCategory(cat, subIdx, 'down')} className="text-blue-300 hover:text-blue-600"><ArrowDown size={12} /></button>
+                                )}
+                            </div>
+                            <button onClick={() => handleRemoveSubCategory(cat, sub)} className="text-blue-300 hover:text-red-500 ml-1"><Trash2 size={12} /></button>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { EntryType, Transaction, CategoryStructure, PaymentMethod } from '../types';
 import { X, Palette, Type as FontIcon, CreditCard, Tag, Calendar, Check } from 'lucide-react';
@@ -162,7 +161,19 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tipo</label>
                 <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl">
                   <button type="button" onClick={() => setType(EntryType.EXPENSE)} className={`py-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest ${type === EntryType.EXPENSE ? 'bg-white shadow-sm text-red-600' : 'text-gray-500'}`}>Saída</button>
-                  <button type="button" onClick={() => setType(EntryType.INCOME)} className={`py-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest ${type === EntryType.INCOME ? 'bg-white shadow-sm text-green-600' : 'text-gray-500'}`}>Entrada</button>
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      setType(EntryType.INCOME);
+                      // Auto-seleciona Salário se disponível
+                      if (categoriesList.includes('Salário')) {
+                        setCategory('Salário');
+                      }
+                    }} 
+                    className={`py-2 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest ${type === EntryType.INCOME ? 'bg-white shadow-sm text-green-600' : 'text-gray-500'}`}
+                  >
+                    Entrada
+                  </button>
                 </div>
               </div>
               <div className="flex-1">
