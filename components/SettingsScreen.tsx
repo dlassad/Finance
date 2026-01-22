@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar, Edit3, Save, X, UserPlus, ShieldCheck, Copy, Check, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar, Edit3, Save, X, UserPlus, ShieldCheck, Copy, Check, RefreshCw, Lock, Users, AlertCircle } from 'lucide-react';
 import { CategoryStructure, PaymentMethod, User } from '../types';
 import { CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
 
@@ -11,6 +11,14 @@ interface SettingsScreenProps {
   onRenamePaymentMethod: (oldName: string, newMethod: PaymentMethod) => void;
   categories: CategoryStructure;
   setCategories: (categories: CategoryStructure) => void;
+}
+
+// Interface auxiliar para o User na lista de gestão (tem id vindo do backend)
+interface ManagedUser {
+  _id: string;
+  name: string;
+  email: string;
+  createdAt: string;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ 
@@ -39,6 +47,53 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [userCreationMsg, setUserCreationMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
   const [copiedPwd, setCopiedPwd] = useState(false);
+
+  // --- Estados do Admin (Listar/Editar Usuários) ---
+  const [userList, setUserList] = useState<ManagedUser[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  
+  // Dados de edição do modal
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserNewPass, setEditUserNewPass] = useState(''); // Para reset
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+
+  // --- Estados de Troca de Senha (Usuário Comum) ---
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newOwnPassword, setNewOwnPassword] = useState('');
+  const [confirmOwnPassword, setConfirmOwnPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Carregar usuários se for admin
+  useEffect(() => {
+    if (currentUser.isAdmin) {
+      loadUsers();
+    }
+  }, [currentUser]);
+
+  const loadUsers = async () => {
+    setIsLoadingUsers(true);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_users',
+          adminId: currentUser.id
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserList(data.users);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar usuários");
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
 
   // --- Lógica de Formas de Pagamento ---
 
@@ -178,7 +233,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleReset = () => {
     if (confirm('Deseja restaurar as categorias e formas de pagamento para o padrão inicial?')) {
-      // Estado LIMPO (sem cartões específicos)
       const initialMethods: PaymentMethod[] = [
         { name: 'DINHEIRO', isCreditCard: false },
         { name: 'PIX', isCreditCard: false }
@@ -225,6 +279,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         setNewUserEmail('');
         setNewUserName('');
         setNewUserPassword('');
+        loadUsers(); // Recarrega lista
       } else {
         setUserCreationMsg({ type: 'error', text: data.message || 'Erro ao criar usuário.' });
       }
@@ -239,6 +294,115 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     navigator.clipboard.writeText(newUserPassword);
     setCopiedPwd(true);
     setTimeout(() => setCopiedPwd(false), 2000);
+  };
+
+  // --- Lógica de Gestão de Usuários (Admin) ---
+  const handleEditUser = (user: ManagedUser) => {
+    setEditingUser(user);
+    setEditUserName(user.name);
+    setEditUserEmail(user.email);
+    setEditUserNewPass('');
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setIsUpdatingUser(true);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'admin_update_user',
+          adminId: currentUser.id,
+          targetUserId: editingUser._id,
+          name: editUserName,
+          email: editUserEmail,
+          newPassword: editUserNewPass || undefined // Envia apenas se preenchido
+        })
+      });
+
+      if (res.ok) {
+        setEditingUser(null);
+        loadUsers();
+        alert('Usuário atualizado com sucesso!');
+      } else {
+        alert('Erro ao atualizar usuário.');
+      }
+    } catch (error) {
+      alert('Erro de conexão.');
+    } finally {
+      setIsUpdatingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('ATENÇÃO: Isso excluirá PERMANENTEMENTE o usuário e todos os lançamentos dele. Tem certeza?')) return;
+    
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'admin_delete_user',
+          adminId: currentUser.id,
+          targetUserId: userId
+        })
+      });
+
+      if (res.ok) {
+        loadUsers();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Erro ao excluir.');
+      }
+    } catch (error) {
+      alert('Erro de conexão.');
+    }
+  };
+
+  // --- Lógica Troca de Senha (Usuário) ---
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newOwnPassword !== confirmOwnPassword) {
+      setPasswordMsg({ type: 'error', text: 'A nova senha e a confirmação não conferem.' });
+      return;
+    }
+    if (newOwnPassword.length < 6) {
+      setPasswordMsg({ type: 'error', text: 'A senha deve ter pelo menos 6 caracteres.' });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordMsg(null);
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'change_password',
+          userId: currentUser.id,
+          currentPassword,
+          newPassword: newOwnPassword
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setPasswordMsg({ type: 'success', text: 'Senha alterada com sucesso!' });
+        setCurrentPassword('');
+        setNewOwnPassword('');
+        setConfirmOwnPassword('');
+      } else {
+        setPasswordMsg({ type: 'error', text: data.message || 'Erro ao alterar senha.' });
+      }
+    } catch (error) {
+      setPasswordMsg({ type: 'error', text: 'Erro de conexão.' });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -272,7 +436,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </div>
             </div>
 
-            <div className="bg-white/10 p-6 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+            <div className="bg-white/10 p-6 rounded-[2rem] border border-white/10 backdrop-blur-sm mb-6">
               <h4 className="flex items-center gap-2 font-bold mb-4 uppercase text-sm tracking-wide">
                 <UserPlus size={16} className="text-blue-400" /> Cadastrar Novo Usuário
               </h4>
@@ -283,7 +447,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">Nome Completo</label>
                     <input 
                       type="text" 
-                      className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder-gray-600"
+                      className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder-gray-600 text-white"
                       placeholder="Ex: João Silva"
                       value={newUserName}
                       onChange={(e) => setNewUserName(e.target.value)}
@@ -294,7 +458,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">E-mail de Acesso</label>
                     <input 
                       type="email" 
-                      className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder-gray-600"
+                      className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder-gray-600 text-white"
                       placeholder="email@exemplo.com"
                       value={newUserEmail}
                       onChange={(e) => setNewUserEmail(e.target.value)}
@@ -350,9 +514,133 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </button>
               </form>
             </div>
+
+            {/* LISTA DE USUÁRIOS */}
+            <div className="bg-white/10 p-6 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+               <h4 className="flex items-center gap-2 font-bold mb-4 uppercase text-sm tracking-wide">
+                <Users size={16} className="text-blue-400" /> Usuários Ativos ({userList.length})
+              </h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                {isLoadingUsers && <p className="text-xs text-center py-4 text-gray-400">Carregando...</p>}
+                {!isLoadingUsers && userList.map(u => (
+                  <div key={u._id} className="bg-gray-800/50 p-3 rounded-xl flex items-center justify-between border border-gray-700">
+                    <div>
+                      <p className="font-bold text-sm text-white">{u.name}</p>
+                      <p className="text-xs text-gray-400">{u.email}</p>
+                    </div>
+                    {u._id !== currentUser.id && (
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleEditUser(u)} 
+                          className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white"
+                          title="Editar / Resetar Senha"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteUser(u._id)} 
+                          className="p-2 bg-red-600/20 hover:bg-red-600 hover:text-white text-red-400 rounded-lg border border-red-500/20"
+                          title="Excluir Usuário"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                    {u._id === currentUser.id && <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-1 rounded-lg">Você</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Modal de Edição de Usuário (Admin) */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden animate-in zoom-in duration-200">
+            <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-black text-lg text-gray-800 uppercase">Editar Usuário</h3>
+              <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-gray-200 rounded-full"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleUpdateUser} className="p-6 space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">Nome</label>
+                <input type="text" className="w-full border rounded-xl px-3 py-2 text-sm" value={editUserName} onChange={e => setEditUserName(e.target.value)} required />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">Email</label>
+                <input type="email" className="w-full border rounded-xl px-3 py-2 text-sm" value={editUserEmail} onChange={e => setEditUserEmail(e.target.value)} required />
+              </div>
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
+                <label className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1 block flex items-center gap-1"><Lock size={10} /> Resetar Senha (Opcional)</label>
+                <input type="text" placeholder="Nova senha (deixe vazio para manter)" className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white" value={editUserNewPass} onChange={e => setEditUserNewPass(e.target.value)} />
+              </div>
+              <button type="submit" disabled={isUpdatingUser} className="w-full bg-blue-600 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs hover:bg-blue-700">{isUpdatingUser ? 'Salvando...' : 'Salvar Alterações'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SEGURANÇA (Troca de Senha Pessoal) */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+        <div className="flex items-center gap-3 mb-2">
+           <div className="bg-emerald-500 p-2.5 rounded-2xl text-white shadow-lg shadow-emerald-200"><Lock size={20} /></div>
+           <h3 className="font-black text-lg text-gray-800 uppercase tracking-tighter">Segurança da Conta</h3>
+        </div>
+        
+        <form onSubmit={handleChangePassword} className="bg-gray-50 rounded-[1.5rem] p-6 border border-gray-100 space-y-4">
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Senha Atual</label>
+            <input 
+              type="password" 
+              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-all"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Nova Senha</label>
+              <input 
+                type="password" 
+                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-all"
+                value={newOwnPassword}
+                onChange={(e) => setNewOwnPassword(e.target.value)}
+                required
+              />
+            </div>
+             <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Confirmar Nova Senha</label>
+              <input 
+                type="password" 
+                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-all"
+                value={confirmOwnPassword}
+                onChange={(e) => setConfirmOwnPassword(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {passwordMsg && (
+             <div className={`p-3 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2 ${passwordMsg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {passwordMsg.type === 'error' && <AlertCircle size={14} />}
+                {passwordMsg.text}
+             </div>
+          )}
+
+          <div className="flex justify-end pt-2">
+             <button 
+                type="submit" 
+                disabled={isChangingPassword}
+                className="bg-gray-900 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2"
+             >
+                {isChangingPassword ? 'Alterando...' : 'Alterar Minha Senha'}
+             </button>
+          </div>
+        </form>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Gestão de Formas de Pagamento */}

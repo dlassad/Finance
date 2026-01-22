@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const { action, email, password, name } = req.body;
+    const { action, email, password, name, userId, currentPassword, newPassword, targetUserId, adminId } = req.body;
 
     // --- LOGIN ---
     if (action === 'login') {
@@ -48,7 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ message: 'E-mail ou senha incorretos' });
       }
       
-      // Verifica se é admin: por email (case insensitive) OU pelo nome "Daniel Assad"
       const isAdmin = (user.email.toLowerCase() === MASTER_EMAIL.toLowerCase()) || 
                       (user.name === 'Daniel Assad');
 
@@ -56,11 +55,90 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: user._id.toString(), 
         name: user.name, 
         email: user.email,
-        isAdmin: isAdmin
+        isAdmin: isAdmin,
+        createdAt: user.createdAt
       });
-    } 
+    }
+
+    // --- ALTERAR SENHA (PRÓPRIO USUÁRIO) ---
+    else if (action === 'change_password') {
+      if (!userId || !currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Dados incompletos.' });
+      }
+
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Usuário não encontrado.' });
+      }
+
+      if (user.password !== currentPassword) {
+        return res.status(401).json({ message: 'Senha atual incorreta.' });
+      }
+
+      user.password = newPassword;
+      await user.save();
+
+      return res.status(200).json({ message: 'Senha alterada com sucesso!' });
+    }
     
-    // --- ADMIN CREATE USER (Chamado via SettingsScreen pelo Master) ---
+    // --- ADMIN: LISTAR USUÁRIOS ---
+    else if (action === 'get_users') {
+      // Verifica se quem pede é admin
+      const admin = await UserModel.findById(adminId);
+      const isMaster = admin && ((admin.email.toLowerCase() === MASTER_EMAIL.toLowerCase()) || (admin.name === 'Daniel Assad'));
+
+      if (!isMaster) {
+        return res.status(403).json({ message: 'Acesso negado.' });
+      }
+
+      // Retorna todos os usuários, ocultando a senha
+      const users = await UserModel.find({}, 'name email createdAt');
+      return res.status(200).json({ users });
+    }
+
+    // --- ADMIN: ATUALIZAR USUÁRIO (RESET SENHA / EDITAR) ---
+    else if (action === 'admin_update_user') {
+      const admin = await UserModel.findById(adminId);
+      const isMaster = admin && ((admin.email.toLowerCase() === MASTER_EMAIL.toLowerCase()) || (admin.name === 'Daniel Assad'));
+
+      if (!isMaster) {
+        return res.status(403).json({ message: 'Acesso negado.' });
+      }
+
+      const targetUser = await UserModel.findById(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: 'Usuário alvo não encontrado.' });
+      }
+
+      if (name) targetUser.name = name;
+      if (email) targetUser.email = email;
+      if (newPassword) targetUser.password = newPassword; // Reset de senha pelo admin
+
+      await targetUser.save();
+
+      return res.status(200).json({ message: 'Usuário atualizado com sucesso.' });
+    }
+
+    // --- ADMIN: EXCLUIR USUÁRIO ---
+    else if (action === 'admin_delete_user') {
+      const admin = await UserModel.findById(adminId);
+      const isMaster = admin && ((admin.email.toLowerCase() === MASTER_EMAIL.toLowerCase()) || (admin.name === 'Daniel Assad'));
+
+      if (!isMaster) {
+        return res.status(403).json({ message: 'Acesso negado.' });
+      }
+
+      if (targetUserId === adminId) {
+        return res.status(400).json({ message: 'Você não pode excluir a si mesmo.' });
+      }
+
+      await UserModel.findByIdAndDelete(targetUserId);
+      await UserDataModel.deleteOne({ userId: targetUserId });
+
+      return res.status(200).json({ message: 'Usuário excluído com sucesso.' });
+    }
+    
+    // --- ADMIN CREATE USER ---
     else if (action === 'admin_create_user') {
       const existing = await UserModel.findOne({ email });
       if (existing) {
@@ -73,32 +151,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         password
       });
 
-      // Criação dos dados iniciais padrão (LIMPO para novos usuários)
       try {
         await UserDataModel.create({
           userId: newUser._id.toString(),
-          transactions: [], // Começa vazio
-          categories: CATEGORY_STRUCTURE, // Mantém categorias padrão
+          transactions: [], 
+          categories: CATEGORY_STRUCTURE,
           paymentMethods: [
             { name: 'DINHEIRO', isCreditCard: false },
             { name: 'PIX', isCreditCard: false }
-            // Removido CARD_SUFFIXES para não injetar cartões do Master
           ]
         });
       } catch (dataError) {
         console.error("Erro ao criar dados iniciais:", dataError);
       }
 
-      // Retorna sucesso mas NÃO faz login (não retorna ID de sessão para o master virar esse user)
       return res.status(201).json({ 
         message: 'Usuário criado com sucesso!',
         createdUser: { name: newUser.name, email: newUser.email }
       });
     }
     
-    // --- LEGACY REGISTER (Mantido apenas para permitir que o Master se cadastre se o banco estiver vazio) ---
+    // --- LEGACY REGISTER ---
     else if (action === 'register') {
-      // Bloqueia auto-cadastro público, exceto se for o Master Email tentando se registrar
       if (email.toLowerCase() !== MASTER_EMAIL.toLowerCase()) {
          return res.status(403).json({ message: 'Auto-cadastro desabilitado. Contate o Administrador.' });
       }
@@ -106,7 +180,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const existing = await UserModel.findOne({ email });
       
       if (existing) {
-        // Verifica usuário zumbi (sem dados)
         const hasData = await UserDataModel.findOne({ userId: existing._id.toString() });
         if (!hasData) {
           await UserModel.deleteOne({ _id: existing._id });
