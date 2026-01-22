@@ -4,7 +4,7 @@ import { UserModel, UserDataModel } from '../lib/models';
 import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE } from '../constants';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Configura CORS para evitar problemas de requisição
+  // Configuração CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -13,33 +13,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
+  // Resposta rápida para preflight OPTIONS
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   try {
-    console.log("API Auth: Iniciando processamento...");
-    
     if (req.method !== 'POST') {
-      return res.status(405).json({ message: 'Method not allowed' });
+      return res.status(405).json({ message: 'Método não permitido' });
     }
 
     if (!process.env.MONGODB_URI) {
-      console.error("ERRO: MONGODB_URI não definida no ambiente.");
-      return res.status(500).json({ message: 'Erro de configuração do servidor (DB)' });
+      console.error("ERRO: MONGODB_URI não definida.");
+      return res.status(500).json({ message: 'Erro de configuração do servidor (DB Missing)' });
     }
 
-    console.log("API Auth: Conectando ao Banco de Dados...");
-    await connectToDatabase();
-    console.log("API Auth: Conectado com sucesso.");
+    try {
+      await connectToDatabase();
+    } catch (dbError: any) {
+      console.error("Erro de Conexão MongoDB:", dbError);
+      return res.status(500).json({ 
+        message: 'Falha ao conectar no Banco de Dados', 
+        error: dbError.message 
+      });
+    }
 
     const { action, email, password, name } = req.body;
 
     if (action === 'login') {
       const user = await UserModel.findOne({ email, password });
       if (!user) {
-        return res.status(401).json({ message: 'E-mail ou senha inválidos' });
+        return res.status(401).json({ message: 'E-mail ou senha incorretos' });
       }
       return res.status(200).json({ 
         id: user._id.toString(), 
@@ -51,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (action === 'register') {
       const existing = await UserModel.findOne({ email });
       if (existing) {
-        return res.status(400).json({ message: 'E-mail já cadastrado' });
+        return res.status(400).json({ message: 'Este e-mail já possui cadastro' });
       }
 
       const newUser = await UserModel.create({
@@ -60,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         password
       });
 
-      // Cria dados iniciais
+      // Criação dos dados iniciais
       try {
         await UserDataModel.create({
           userId: newUser._id.toString(),
@@ -74,6 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       } catch (dataError) {
         console.error("Erro ao criar dados iniciais:", dataError);
+        // Não falha o request principal, mas loga o erro
       }
 
       return res.status(201).json({ 
@@ -86,10 +91,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ message: 'Ação inválida' });
 
   } catch (error: any) {
-    console.error("Erro CRÍTICO na API:", error);
+    console.error("Erro Geral na API:", error);
     return res.status(500).json({ 
       message: 'Erro interno do servidor', 
-      error: error.message || 'Falha desconhecida' 
+      error: error.message || 'Erro desconhecido' 
     });
   }
 }
