@@ -2,22 +2,26 @@
 import React, { useState } from 'react';
 import { Transaction, EntryType } from '../types';
 import { formatCurrency } from '../utils';
-import { X, Calendar, Edit3, Save, RotateCcw } from 'lucide-react';
+import { X, Calendar, Edit3, Save, RotateCcw, Split } from 'lucide-react';
 
 interface AdjustmentModalProps {
   transaction: Transaction;
   monthKey: string;
+  selectedDate: Date;
   onClose: () => void;
   onSaveOverride: (transactionId: string, monthKey: string, amount: number | null) => void;
   onEditOriginal: (transaction: Transaction) => void;
+  onSplitSeries: (transaction: Transaction, selectedDate: Date) => void;
 }
 
 export const AdjustmentModal: React.FC<AdjustmentModalProps> = ({ 
   transaction, 
   monthKey, 
+  selectedDate,
   onClose, 
   onSaveOverride,
-  onEditOriginal
+  onEditOriginal,
+  onSplitSeries
 }) => {
   const currentVal = transaction.overrides?.[monthKey] ?? (transaction.installments ? transaction.amount / transaction.installments.total : transaction.amount);
   const [amount, setAmount] = useState(Math.abs(currentVal).toString());
@@ -56,6 +60,8 @@ export const AdjustmentModal: React.FC<AdjustmentModalProps> = ({
     onSaveOverride(transaction.id, monthKey, null);
     onClose();
   };
+
+  const showSplitOption = transaction.isRecurring;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
@@ -120,6 +126,16 @@ export const AdjustmentModal: React.FC<AdjustmentModalProps> = ({
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
                 <div className="relative flex justify-center text-[10px] font-black uppercase text-gray-300"><span className="bg-white px-2">Ou</span></div>
               </div>
+
+              {showSplitOption && (
+                <button
+                  type="button"
+                  onClick={() => { onSplitSeries(transaction, selectedDate); onClose(); }}
+                  className="w-full bg-indigo-50 text-indigo-700 font-black py-4 rounded-2xl flex items-center justify-center gap-2 border border-indigo-100 hover:bg-indigo-100 transition-all active:scale-95 mb-2"
+                >
+                  <Split size={20} /> ALTERAR SÉRIE DAQUI EM DIANTE
+                </button>
+              )}
 
               <button
                 type="button"

@@ -28,7 +28,7 @@ interface ProjectionGridProps {
   setProjectionStartDate: (date: Date) => void;
   categories: string[];
   cards: string[];
-  onEditClick: (transaction: Transaction, monthKey: string) => void;
+  onEditClick: (transaction: Transaction, monthKey: string, date: Date) => void;
 }
 
 export const ProjectionGrid: React.FC<ProjectionGridProps> = ({ 
@@ -104,12 +104,18 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
     const targetDate = new Date(projectionStartDate.getFullYear(), projectionStartDate.getMonth() + monthIdx, 1);
     const monthKey = summaries[monthIdx].month;
 
-    return transactions.filter(t => {
+    const filtered = transactions.filter(t => {
       const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = !selectedCategory || t.category === selectedCategory;
       const matchesCard = !selectedCard || t.cardSuffix === selectedCard;
       
       if (!matchesSearch || !matchesCategory || !matchesCard) return false;
+
+      // Check endDate inside filter to be safe
+      if (t.endDate) {
+         const endD = new Date(t.endDate);
+         if (endD < new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)) return false;
+      }
 
       let baseDate: Date;
       if (t.billingDate) {
@@ -117,6 +123,9 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
       } else {
         baseDate = new Date(t.date);
       }
+      
+      // If transaction starts in future relative to this month, skip
+      if (baseDate > new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0)) return false;
       
       if (t.isRecurring) return true;
       const isSameMonth = baseDate.getMonth() === targetDate.getMonth() && baseDate.getFullYear() === targetDate.getFullYear();
@@ -144,8 +153,10 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
         installmentInfo = ` (${currentInstallment}/${t.installments.total})`;
       }
 
-      return { ...t, displayAmount, installmentInfo, hasOverride, monthKey };
+      return { ...t, displayAmount, installmentInfo, hasOverride, monthKey, targetDate };
     });
+
+    return { items: filtered, targetDate };
   };
 
   const formattedStartMonth = `${projectionStartDate.getFullYear()}-${String(projectionStartDate.getMonth() + 1).padStart(2, '0')}`;
@@ -322,7 +333,8 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
           <div className="flex min-w-max">
             {summaries.map((summary, idx) => {
               if (hiddenMonths.has(idx)) return null;
-              const monthlyItems = getFilteredTransactionsForMonth(idx);
+              
+              const { items: monthlyItems, targetDate } = getFilteredTransactionsForMonth(idx);
               const monthlyResult = summary.income + summary.expense;
               const accumulatedBalance = summary.balance;
               
@@ -351,7 +363,7 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
                          return (
                            <div 
                              key={tIdx} 
-                             onClick={() => onEditClick(t, t.monthKey)}
+                             onClick={() => onEditClick(t, t.monthKey, targetDate)}
                              className={`mx-2 my-2 p-3 rounded-2xl border transition-all group/item relative cursor-pointer ${
                                t.hasOverride ? 'bg-amber-50 border-amber-200 shadow-sm' : 'border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md'
                              } ${t.color || ''} ${t.fontColor || (dark ? 'text-white' : 'text-gray-900')}`}

@@ -58,7 +58,19 @@ export const calculateProjections = (
     monthDate.setMonth(startDate.getMonth() + i);
     const monthKey = getMonthYear(monthDate);
 
+    // Definir o último dia do mês atual para comparação com endDate
+    const lastDayOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+
     const monthlyTransactions = transactions.filter(t => {
+      // Verifica endDate: Se a transação tem data de fim e ela é anterior ao início deste mês, ignora.
+      if (t.endDate) {
+        const endD = new Date(t.endDate);
+        // Ajusta para ignorar hora, compara apenas datas
+        if (endD < new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)) {
+            return false;
+        }
+      }
+
       let tDate: Date;
       if (t.billingDate) {
         tDate = new Date(t.billingDate + '-01T12:00:00');
@@ -66,6 +78,9 @@ export const calculateProjections = (
         tDate = new Date(t.date);
       }
       
+      // Se a data de início da transação for no futuro em relação ao mês atual da projeção, ignora
+      if (tDate > lastDayOfMonth) return false;
+
       if (t.isRecurring) return true;
       
       const isSameMonth = tDate.getMonth() === monthDate.getMonth() && tDate.getFullYear() === monthDate.getFullYear();

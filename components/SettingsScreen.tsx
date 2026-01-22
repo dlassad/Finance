@@ -6,13 +6,15 @@ import { CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIE
 interface SettingsScreenProps {
   paymentMethods: PaymentMethod[];
   setPaymentMethods: (methods: PaymentMethod[]) => void;
+  onRenamePaymentMethod: (oldName: string, newMethod: PaymentMethod) => void;
   categories: CategoryStructure;
   setCategories: (categories: CategoryStructure) => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ 
   paymentMethods, 
-  setPaymentMethods, 
+  setPaymentMethods,
+  onRenamePaymentMethod,
   categories, 
   setCategories
 }) => {
@@ -54,8 +56,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
 
     if (editingOriginalName) {
-      // Atualizar existente
-      setPaymentMethods(paymentMethods.map(m => m.name === editingOriginalName ? methodData : m));
+      // Atualização segura que reflete nas transações
+      onRenamePaymentMethod(editingOriginalName, methodData);
       setEditingOriginalName(null);
     } else {
       // Criar novo

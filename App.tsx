@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   TrendingUp, 
@@ -51,7 +52,11 @@ const App: React.FC = () => {
   const [selectedCardDate, setSelectedCardDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [adjustingTransaction, setAdjustingTransaction] = useState<{t: Transaction, month: string} | null>(null);
+  
+  // Estado para controlar a divisão de série (recorrência)
+  const [splitOriginalId, setSplitOriginalId] = useState<string | null>(null);
+
+  const [adjustingTransaction, setAdjustingTransaction] = useState<{t: Transaction, month: string, date: Date} | null>(null);
   const [reconcilingCard, setReconcilingCard] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -173,7 +178,18 @@ const App: React.FC = () => {
       if (!t.cardSuffix || t.type !== EntryType.EXPENSE) return false;
       const method = paymentMethods.find(pm => pm.name === t.cardSuffix);
       if (!method || !method.isCreditCard) return false;
+      
+      // Check endDate
+      if (t.endDate) {
+         const endD = new Date(t.endDate);
+         if (endD < new Date(selectedCardDate.getFullYear(), selectedCardDate.getMonth(), 1)) return false;
+      }
+
       let baseDate = t.billingDate ? new Date(t.billingDate + '-01T12:00:00') : new Date(t.date);
+      
+      // Futuro relativo a este cartao
+      if (baseDate > new Date(selectedCardDate.getFullYear(), selectedCardDate.getMonth() + 1, 0)) return false;
+
       if (t.isRecurring) return true;
       const isSameMonth = baseDate.getMonth() === selectedCardDate.getMonth() && baseDate.getFullYear() === selectedCardDate.getFullYear();
       if (isSameMonth) return true;
@@ -209,7 +225,31 @@ const App: React.FC = () => {
   }, [transactions, selectedCardDate, paymentMethods]);
 
   const handleSaveTransaction = (data: Omit<Transaction, 'id'> | Transaction) => {
-    if ('id' in data) {
+    // Se estivermos dividindo uma transação (Alterar daqui em diante)
+    if (splitOriginalId && !('id' in data)) {
+       // 1. Atualizar a transação antiga para terminar no mês anterior
+       const newTransaction = { ...data, id: Math.random().toString(36).substr(2, 9) };
+       
+       // A data selecionada para a nova transação
+       const startDateOfNew = new Date(newTransaction.date);
+       // A data de fim da antiga deve ser o dia anterior ao início da nova
+       const endDateOfOld = new Date(startDateOfNew);
+       endDateOfOld.setDate(endDateOfOld.getDate() - 1);
+       
+       setTransactions(prev => {
+         const updated = prev.map(t => {
+           if (t.id === splitOriginalId) {
+             return { ...t, endDate: endDateOfOld.toISOString().split('T')[0] };
+           }
+           return t;
+         });
+         return [...updated, newTransaction as Transaction];
+       });
+       
+       setSplitOriginalId(null);
+    } 
+    // Comportamento normal de edição/criação
+    else if ('id' in data) {
       setTransactions(prev => prev.map(t => t.id === data.id ? (data as Transaction) : t));
     } else {
       const tx: Transaction = { ...data, id: Math.random().toString(36).substr(2, 9) };
@@ -218,13 +258,45 @@ const App: React.FC = () => {
     setEditingTransaction(null);
   };
 
+  const handleRenamePaymentMethod = (oldName: string, newMethod: PaymentMethod) => {
+    // Atualiza a lista de métodos de pagamento
+    setPaymentMethods(prev => prev.map(pm => pm.name === oldName ? newMethod : pm));
+
+    // Se o nome mudou, atualiza todas as transações que usavam esse nome
+    if (oldName !== newMethod.name) {
+      setTransactions(prev => prev.map(t => 
+        t.cardSuffix === oldName ? { ...t, cardSuffix: newMethod.name } : t
+      ));
+    }
+  };
+
   const handleEditClick = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setIsModalOpen(true);
   };
 
-  const handleProjectionItemClick = (transaction: Transaction, monthKey: string) => {
-    setAdjustingTransaction({ t: transaction, month: monthKey });
+  const handleProjectionItemClick = (transaction: Transaction, monthKey: string, date: Date) => {
+    setAdjustingTransaction({ t: transaction, month: monthKey, date: date });
+  };
+  
+  const handleSplitSeries = (transaction: Transaction, selectedDate: Date) => {
+    // 1. Prepara a "nova" transação baseada na antiga
+    // Define a data para o dia 1 do mês selecionado na projeção
+    const newStartDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    
+    const newTxData = {
+      ...transaction,
+      id: undefined, // Remove ID para ser tratada como nova no form
+      date: newStartDate.toISOString().split('T')[0],
+      // Limpa overrides antigos pois é uma nova serie
+      overrides: undefined, 
+      endDate: undefined
+    };
+    
+    // @ts-ignore - hack para passar o objeto sem ID para o modal que espera Transaction ou Omit
+    setEditingTransaction(newTxData as Transaction);
+    setSplitOriginalId(transaction.id);
+    setIsModalOpen(true);
   };
 
   // Funções de Seleção Múltipla
@@ -443,7 +515,8 @@ const App: React.FC = () => {
           {activeTab === 'settings' && (
             <SettingsScreen 
               paymentMethods={paymentMethods} 
-              setPaymentMethods={setPaymentMethods} 
+              setPaymentMethods={setPaymentMethods}
+              onRenamePaymentMethod={handleRenamePaymentMethod}
               categories={categories} 
               setCategories={setCategories}
             />
@@ -451,8 +524,8 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {isModalOpen && <AddTransactionModal onClose={() => { setIsModalOpen(false); setEditingTransaction(null); }} onSave={handleSaveTransaction} initialData={editingTransaction} paymentOptions={paymentMethods} categoryStructure={categories} />}
-      {adjustingTransaction && <AdjustmentModal transaction={adjustingTransaction.t} monthKey={adjustingTransaction.month} onClose={() => setAdjustingTransaction(null)} onSaveOverride={(id, mk, amt) => {
+      {isModalOpen && <AddTransactionModal onClose={() => { setIsModalOpen(false); setEditingTransaction(null); setSplitOriginalId(null); }} onSave={handleSaveTransaction} initialData={editingTransaction} paymentOptions={paymentMethods} categoryStructure={categories} />}
+      {adjustingTransaction && <AdjustmentModal transaction={adjustingTransaction.t} monthKey={adjustingTransaction.month} selectedDate={adjustingTransaction.date} onClose={() => setAdjustingTransaction(null)} onSaveOverride={(id, mk, amt) => {
         setTransactions(prev => prev.map(t => {
           if (t.id === id) {
             const newOverrides = { ...(t.overrides || {}) };
@@ -462,7 +535,7 @@ const App: React.FC = () => {
           }
           return t;
         }));
-      }} onEditOriginal={handleEditClick} />}
+      }} onEditOriginal={handleEditClick} onSplitSeries={handleSplitSeries} />}
       {reconcilingCard && (
         <ReconciliationModal 
           cardSuffix={reconcilingCard} 
