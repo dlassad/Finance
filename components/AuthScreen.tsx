@@ -47,20 +47,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         })
       });
 
-      // Primeiro pegamos o texto puro para evitar erro de JSON inválido
       const responseText = await response.text();
       let data;
 
       try {
         data = JSON.parse(responseText);
       } catch (jsonError) {
-        console.error("Erro ao processar resposta do servidor:", responseText);
-        // Se não for JSON, provavelmente é um erro 500 do Vercel
-        throw new Error('O servidor encontrou um erro interno. Tente novamente mais tarde.');
+        console.error("Erro bruto do servidor:", responseText);
+        const errorMessageSnippet = responseText.replace(/<[^>]*>?/gm, '').slice(0, 150);
+        throw new Error(`Erro Crítico (HTML): ${errorMessageSnippet}... (Verifique Logs do Vercel)`);
       }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Erro na autenticação');
+        // AQUI ESTÁ A MUDANÇA: Exibe o 'data.error' se existir, que contém a mensagem técnica do MongoDB
+        const serverError = data.error ? `${data.message}: ${data.error}` : data.message;
+        throw new Error(serverError || 'Erro na autenticação');
       }
 
       onLogin(data);
@@ -147,7 +148,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               </div>
             )}
 
-            {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
+            {error && (
+              <div className="bg-red-50 p-3 rounded-xl border border-red-100">
+                <p className="text-red-600 text-xs font-bold text-center break-words leading-relaxed">{error}</p>
+              </div>
+            )}
 
             <button
               type="submit"
