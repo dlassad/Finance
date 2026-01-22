@@ -303,6 +303,8 @@ const App: React.FC = () => {
       date: newStartDateStr,
       // Limpa overrides antigos pois é uma nova serie
       overrides: undefined, 
+      colorOverrides: undefined,
+      fontColorOverrides: undefined,
       endDate: undefined,
       reconciled: false // Reseta status de conciliação para a nova série futura
     };
@@ -542,13 +544,30 @@ const App: React.FC = () => {
       </main>
 
       {isModalOpen && <AddTransactionModal onClose={() => { setIsModalOpen(false); setEditingTransaction(null); setSplitOriginalId(null); }} onSave={handleSaveTransaction} initialData={editingTransaction} paymentOptions={paymentMethods} categoryStructure={categories} />}
-      {adjustingTransaction && <AdjustmentModal transaction={adjustingTransaction.t} monthKey={adjustingTransaction.month} selectedDate={adjustingTransaction.date} onClose={() => setAdjustingTransaction(null)} onSaveOverride={(id, mk, amt) => {
+      {adjustingTransaction && <AdjustmentModal transaction={adjustingTransaction.t} monthKey={adjustingTransaction.month} selectedDate={adjustingTransaction.date} onClose={() => setAdjustingTransaction(null)} onSaveOverride={(id, mk, amt, col, fCol) => {
         setTransactions(prev => prev.map(t => {
           if (t.id === id) {
             const newOverrides = { ...(t.overrides || {}) };
-            if (amt === null) delete newOverrides[mk];
-            else newOverrides[mk] = amt;
-            return { ...t, overrides: newOverrides };
+            const newColorOverrides = { ...(t.colorOverrides || {}) };
+            const newFontColorOverrides = { ...(t.fontColorOverrides || {}) };
+
+            if (amt === null) {
+                // Remover override
+                delete newOverrides[mk];
+                delete newColorOverrides[mk];
+                delete newFontColorOverrides[mk];
+            } else {
+                newOverrides[mk] = amt;
+                if (col) newColorOverrides[mk] = col;
+                if (fCol) newFontColorOverrides[mk] = fCol;
+            }
+            
+            return { 
+                ...t, 
+                overrides: newOverrides,
+                colorOverrides: newColorOverrides,
+                fontColorOverrides: newFontColorOverrides
+            };
           }
           return t;
         }));

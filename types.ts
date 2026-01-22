@@ -37,6 +37,8 @@ export interface Transaction {
   overrides?: Record<string, number>;
   color?: string;
   fontColor?: string;
+  colorOverrides?: Record<string, string>; // Cor de fundo específica por mês
+  fontColorOverrides?: Record<string, string>; // Cor da fonte específica por mês
   reconciled?: boolean;
 }
 

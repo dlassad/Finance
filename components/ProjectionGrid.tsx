@@ -191,7 +191,20 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
         installmentInfo = ` (${currentInstallment}/${t.installments.total})`;
       }
 
-      return { ...t, displayAmount, installmentInfo, hasOverride, monthKey, targetDate };
+      // Verifica overrides de cor
+      const finalColor = t.colorOverrides?.[monthKey] || t.color;
+      const finalFontColor = t.fontColorOverrides?.[monthKey] || t.fontColor;
+
+      return { 
+          ...t, 
+          displayAmount, 
+          installmentInfo, 
+          hasOverride, 
+          monthKey, 
+          targetDate,
+          color: finalColor, // Substitui pela cor específica do mês se houver
+          fontColor: finalFontColor 
+      };
     });
 
     return { items: filtered, targetDate };
