@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   TrendingUp, 
@@ -30,7 +31,7 @@ import { ReconciliationModal } from './components/ReconciliationModal';
 import { SettingsScreen } from './components/SettingsScreen';
 import { AdjustmentModal } from './components/AdjustmentModal';
 import { AuthScreen } from './components/AuthScreen';
-import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE } from './constants';
+import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE, MASTER_EMAIL } from './constants';
 
 const App: React.FC = () => {
   // Removido o uso de localStorage para iniciar o estado
@@ -378,7 +379,9 @@ const App: React.FC = () => {
                   {saveError ? <AlertTriangle size={16} /> : <UserIcon size={16} />}
                 </div>
                 <div className="overflow-hidden flex-1">
-                  <p className="text-[11px] font-black text-gray-800 truncate">{currentUser.name}</p>
+                  <p className="text-[11px] font-black text-gray-800 truncate">
+                    {currentUser.name} {currentUser.isAdmin && '(Master)'}
+                  </p>
                   <p className="text-[9px] text-gray-400 font-bold truncate">{currentUser.email}</p>
                 </div>
                 {isSaving && <RefreshCw size={14} className="animate-spin text-blue-500" />}
@@ -527,6 +530,7 @@ const App: React.FC = () => {
 
           {activeTab === 'settings' && (
             <SettingsScreen 
+              currentUser={currentUser}
               paymentMethods={paymentMethods} 
               setPaymentMethods={setPaymentMethods}
               onRenamePaymentMethod={handleRenamePaymentMethod}

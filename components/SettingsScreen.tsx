@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
-import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar, Edit3, Save, X } from 'lucide-react';
-import { CategoryStructure, PaymentMethod } from '../types';
+import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar, Edit3, Save, X, UserPlus, ShieldCheck, Copy, Check, RefreshCw } from 'lucide-react';
+import { CategoryStructure, PaymentMethod, User } from '../types';
 import { CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
 
 interface SettingsScreenProps {
+  currentUser: User;
   paymentMethods: PaymentMethod[];
   setPaymentMethods: (methods: PaymentMethod[]) => void;
   onRenamePaymentMethod: (oldName: string, newMethod: PaymentMethod) => void;
@@ -12,6 +14,7 @@ interface SettingsScreenProps {
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ 
+  currentUser,
   paymentMethods, 
   setPaymentMethods,
   onRenamePaymentMethod,
@@ -23,19 +26,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [newMethodDueDay, setNewMethodDueDay] = useState('');
   const [newMethodBestDay, setNewMethodBestDay] = useState('');
   
-  // Estado para controlar a edição
   const [editingOriginalName, setEditingOriginalName] = useState<string | null>(null);
 
   const [newCategory, setNewCategory] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [newSubCategory, setNewSubCategory] = useState('');
 
+  // --- Estados do Admin (Criar Usuário) ---
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [userCreationMsg, setUserCreationMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
+  const [copiedPwd, setCopiedPwd] = useState(false);
+
   // --- Lógica de Formas de Pagamento ---
 
   const handleSaveMethod = () => {
     if (!newMethodName) return;
 
-    // Verifica duplicidade (ignorando o próprio item se estiver editando)
     const nameExists = paymentMethods.some(
       m => m.name.toUpperCase() === newMethodName.toUpperCase() && m.name !== editingOriginalName
     );
@@ -56,15 +65,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
 
     if (editingOriginalName) {
-      // Atualização segura que reflete nas transações
       onRenamePaymentMethod(editingOriginalName, methodData);
       setEditingOriginalName(null);
     } else {
-      // Criar novo
       setPaymentMethods([...paymentMethods, methodData]);
     }
 
-    // Resetar formulário
     setNewMethodName('');
     setNewMethodIsCard(false);
     setNewMethodDueDay('');
@@ -77,8 +83,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setNewMethodDueDay(method.dueDay ? method.dueDay.toString() : '');
     setNewMethodBestDay(method.bestDay ? method.bestDay.toString() : '');
     setEditingOriginalName(method.name);
-    
-    // Rola a página para o topo do formulário suavemente
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -134,15 +138,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const swapIndex = direction === 'up' ? index - 1 : index + 1;
     [newKeys[index], newKeys[swapIndex]] = [newKeys[swapIndex], newKeys[index]];
 
-    // Reconstrói o objeto na nova ordem
     const newCategories: CategoryStructure = {};
     newKeys.forEach(key => {
         newCategories[key] = categories[key];
     });
     setCategories(newCategories);
   };
-
-  // --- Lógica de Subcategorias ---
 
   const handleAddSubCategory = (cat: string) => {
     if (newSubCategory && !categories[cat].includes(newSubCategory)) {
@@ -187,6 +188,59 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
+  // --- Lógica Admin ---
+  
+  const generateStrongPassword = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewUserPassword(password);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName || !newUserEmail || !newUserPassword) return;
+
+    setIsCreatingUser(true);
+    setUserCreationMsg(null);
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'admin_create_user',
+          name: newUserName,
+          email: newUserEmail,
+          password: newUserPassword
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setUserCreationMsg({ type: 'success', text: `Usuário ${newUserName} criado com sucesso!` });
+        setNewUserEmail('');
+        setNewUserName('');
+        setNewUserPassword('');
+      } else {
+        setUserCreationMsg({ type: 'error', text: data.message || 'Erro ao criar usuário.' });
+      }
+    } catch (error) {
+      setUserCreationMsg({ type: 'error', text: 'Erro de conexão.' });
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(newUserPassword);
+    setCopiedPwd(true);
+    setTimeout(() => setCopiedPwd(false), 2000);
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-end">
@@ -201,6 +255,104 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <RotateCcw size={14} /> RESTAURAR PADRÕES
         </button>
       </div>
+
+      {/* PAINEL DO USUÁRIO MASTER */}
+      {currentUser.isAdmin && (
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-[2.5rem] shadow-xl text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-blue-500 p-2.5 rounded-2xl text-white shadow-lg shadow-blue-900/50">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <h3 className="font-black text-xl uppercase tracking-tighter">Painel Master (Daniel Assad)</h3>
+                <p className="text-gray-400 text-sm font-medium">Gestão de Usuários e Acessos</p>
+              </div>
+            </div>
+
+            <div className="bg-white/10 p-6 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+              <h4 className="flex items-center gap-2 font-bold mb-4 uppercase text-sm tracking-wide">
+                <UserPlus size={16} className="text-blue-400" /> Cadastrar Novo Usuário
+              </h4>
+              
+              <form onSubmit={handleCreateUser} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">Nome Completo</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder-gray-600"
+                      placeholder="Ex: João Silva"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">E-mail de Acesso</label>
+                    <input 
+                      type="email" 
+                      className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder-gray-600"
+                      placeholder="email@exemplo.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1 block">Senha Segura</label>
+                   <div className="flex gap-2">
+                     <input 
+                        type="text" 
+                        className="flex-1 bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-2 text-sm font-mono text-blue-300 font-bold focus:border-blue-500 outline-none transition-all"
+                        placeholder="Clique em Gerar Senha"
+                        value={newUserPassword}
+                        onChange={(e) => setNewUserPassword(e.target.value)}
+                        required
+                     />
+                     <button 
+                        type="button" 
+                        onClick={generateStrongPassword}
+                        className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-2"
+                     >
+                       <RefreshCw size={14} /> Gerar
+                     </button>
+                     {newUserPassword && (
+                       <button 
+                          type="button" 
+                          onClick={copyToClipboard}
+                          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-xl text-white transition-colors"
+                          title="Copiar Senha"
+                       >
+                         {copiedPwd ? <Check size={18} className="text-green-400" /> : <Copy size={18} />}
+                       </button>
+                     )}
+                   </div>
+                   <p className="text-[10px] text-gray-500 mt-1">* A senha deve ser enviada manualmente ao usuário.</p>
+                </div>
+
+                {userCreationMsg && (
+                  <div className={`p-3 rounded-xl text-xs font-bold text-center ${userCreationMsg.type === 'success' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
+                    {userCreationMsg.text}
+                  </div>
+                )}
+
+                <button 
+                  type="submit" 
+                  disabled={isCreatingUser}
+                  className="w-full bg-white text-gray-900 hover:bg-gray-100 font-black py-3 rounded-xl uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                >
+                  {isCreatingUser ? 'Criando...' : 'Confirmar Criação de Usuário'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Gestão de Formas de Pagamento */}

@@ -1,6 +1,9 @@
 
 import { EntryType, Transaction } from './types';
 
+// E-mail do Usuário Master (Admin)
+export const MASTER_EMAIL = 'daniel.assad@finance.com';
+
 export const CARD_SUFFIXES = ['MLI', 'SSG', 'AMZ', 'NUB', 'TINA'];
 
 export const CATEGORY_STRUCTURE: Record<string, string[]> = {

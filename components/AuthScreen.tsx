@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Wallet, Mail, Lock, User as UserIcon, ArrowRight, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Wallet, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 import { User } from '../types';
 
 interface AuthScreenProps {
@@ -7,22 +8,11 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const validatePassword = (pass: string) => {
-    const hasUpper = /[A-Z]/.test(pass);
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
-    const hasMinLength = pass.length >= 8;
-    return { hasUpper, hasSpecial, hasMinLength, isValid: hasUpper && hasSpecial && hasMinLength };
-  };
-
-  const pwdValidation = validatePassword(password);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,20 +20,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      if (!isLogin && !pwdValidation.isValid) {
-        setError('A senha não atende aos requisitos de segurança.');
-        setLoading(false);
-        return;
-      }
-
       const response = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: isLogin ? 'login' : 'register',
+          action: 'login',
           email,
-          password,
-          name: isLogin ? undefined : name
+          password
         })
       });
 
@@ -54,12 +37,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         data = JSON.parse(responseText);
       } catch (jsonError) {
         console.error("Erro bruto do servidor:", responseText);
-        const errorMessageSnippet = responseText.replace(/<[^>]*>?/gm, '').slice(0, 150);
-        throw new Error(`Erro Crítico (HTML): ${errorMessageSnippet}... (Verifique Logs do Vercel)`);
+        throw new Error(`Erro Crítico: Resposta inválida do servidor.`);
       }
 
       if (!response.ok) {
-        // AQUI ESTÁ A MUDANÇA: Exibe o 'data.error' se existir, que contém a mensagem técnica do MongoDB
         const serverError = data.error ? `${data.message}: ${data.error}` : data.message;
         throw new Error(serverError || 'Erro na autenticação');
       }
@@ -85,20 +66,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           </div>
 
           <form onSubmit={handleAuth} className="space-y-6">
-            {!isLogin && (
-              <div className="relative">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Nome Completo"
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold text-sm"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-            )}
-
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
@@ -130,24 +97,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               </button>
             </div>
 
-            {!isLogin && password.length > 0 && (
-              <div className="bg-gray-50 p-4 rounded-2xl space-y-2 border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Requisitos de Segurança:</p>
-                <div className="flex items-center gap-2 text-[11px] font-bold">
-                  {pwdValidation.hasMinLength ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-red-400" />}
-                  <span className={pwdValidation.hasMinLength ? 'text-green-600' : 'text-gray-500'}>Mínimo 8 caracteres</span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] font-bold">
-                  {pwdValidation.hasUpper ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-red-400" />}
-                  <span className={pwdValidation.hasUpper ? 'text-green-600' : 'text-gray-500'}>Uma letra maiúscula</span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] font-bold">
-                  {pwdValidation.hasSpecial ? <CheckCircle2 size={14} className="text-green-500" /> : <XCircle size={14} className="text-red-400" />}
-                  <span className={pwdValidation.hasSpecial ? 'text-green-600' : 'text-gray-500'}>Um caractere especial (!@#$)</span>
-                </div>
-              </div>
-            )}
-
             {error && (
               <div className="bg-red-50 p-3 rounded-xl border border-red-100">
                 <p className="text-red-600 text-xs font-bold text-center break-words leading-relaxed">{error}</p>
@@ -161,11 +110,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             >
               {loading ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" /> Processando...
+                  <Loader2 size={18} className="animate-spin" /> Entrando...
                 </>
               ) : (
                 <>
-                  {isLogin ? 'Entrar no Sistema' : 'Criar minha Conta'}
+                  Acessar Sistema
                   <ArrowRight size={18} />
                 </>
               )}
@@ -173,12 +122,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           </form>
 
           <div className="mt-8 pt-8 border-t border-gray-100 text-center">
-            <button
-              onClick={() => { setIsLogin(!isLogin); setError(''); }}
-              className="text-gray-400 hover:text-blue-600 text-sm font-bold transition-colors"
-            >
-              {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Faça login'}
-            </button>
+            <p className="text-gray-400 text-xs font-medium">
+              Acesso restrito. Não possui conta? <br/>
+              Contate o <span className="font-bold text-blue-600">Administrador (Daniel Assad)</span>.
+            </p>
           </div>
         </div>
       </div>
