@@ -143,7 +143,7 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
     const targetDate = new Date(projectionStartDate.getFullYear(), projectionStartDate.getMonth() + monthIdx, 1);
     const monthKey = summaries[monthIdx].month;
 
-    const filtered = transactions.filter(t => {
+    const filtered: ProcessedTransaction[] = transactions.filter(t => {
       const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = !selectedCategory || t.category === selectedCategory;
       const matchesCard = !selectedCard || t.cardSuffix === selectedCard;
@@ -181,9 +181,10 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
       let installmentInfo = "";
 
       // Verifica overrides de valor
-      const hasAmountOverride = t.overrides && t.overrides[monthKey] !== undefined;
-      if (hasAmountOverride) {
-        displayAmount = t.overrides![monthKey];
+      const hasAmountOverride = t.overrides ? t.overrides[monthKey] !== undefined : false;
+      
+      if (hasAmountOverride && t.overrides) {
+        displayAmount = t.overrides[monthKey];
       } else if (t.installments) {
         let baseDate = t.billingDate ? new Date(t.billingDate + '-01T12:00:00') : new Date(t.date);
         displayAmount = t.amount / t.installments.total;
@@ -193,11 +194,11 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
       }
 
       // Verifica overrides de cor
-      const hasColorOverride = t.colorOverrides && t.colorOverrides[monthKey] !== undefined;
-      const hasFontOverride = t.fontColorOverrides && t.fontColorOverrides[monthKey] !== undefined;
+      const hasColorOverride = t.colorOverrides ? t.colorOverrides[monthKey] !== undefined : false;
+      const hasFontOverride = t.fontColorOverrides ? t.fontColorOverrides[monthKey] !== undefined : false;
       
-      const finalColor = hasColorOverride ? t.colorOverrides![monthKey] : t.color;
-      const finalFontColor = hasFontOverride ? t.fontColorOverrides![monthKey] : t.fontColor;
+      const finalColor = hasColorOverride && t.colorOverrides ? t.colorOverrides[monthKey] : t.color;
+      const finalFontColor = hasFontOverride && t.fontColorOverrides ? t.fontColorOverrides[monthKey] : t.fontColor;
 
       return { 
           ...t, 
