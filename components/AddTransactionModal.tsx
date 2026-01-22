@@ -157,12 +157,16 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         current: initialData?.installments?.current || 1, 
         total: Number(installmentsTotal) 
       } : undefined,
+      // Preserva overrides e endDate se existirem no initialData e não forem modificados aqui
+      overrides: initialData?.overrides, 
+      endDate: initialData?.endDate,
       reconciled: initialData?.reconciled || false
     };
 
-    if (initialData) {
+    if (initialData && initialData.id) {
       onSave({ ...transactionData, id: initialData.id });
     } else {
+      // Caso seja novo ou split (sem ID no initialData)
       onSave(transactionData);
     }
     onClose();

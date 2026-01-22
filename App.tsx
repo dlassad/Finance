@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   TrendingUp, 
@@ -225,21 +224,28 @@ const App: React.FC = () => {
   }, [transactions, selectedCardDate, paymentMethods]);
 
   const handleSaveTransaction = (data: Omit<Transaction, 'id'> | Transaction) => {
-    // Se estivermos dividindo uma transação (Alterar daqui em diante)
-    if (splitOriginalId && !('id' in data)) {
-       // 1. Atualizar a transação antiga para terminar no mês anterior
+    // 1. PRIORIDADE: Se estiver em modo Split Series, executa a divisão
+    if (splitOriginalId) {
        const newTransaction = { ...data, id: Math.random().toString(36).substr(2, 9) };
        
-       // A data selecionada para a nova transação
-       const startDateOfNew = new Date(newTransaction.date);
+       // Data segura para manipulação
+       const [y, m, d] = newTransaction.date.split('-').map(Number);
+       const startDateOfNew = new Date(y, m - 1, d); // Cria em hora local 00:00
+       
        // A data de fim da antiga deve ser o dia anterior ao início da nova
        const endDateOfOld = new Date(startDateOfNew);
        endDateOfOld.setDate(endDateOfOld.getDate() - 1);
        
+       // Formata endDateOfOld para YYYY-MM-DD
+       const endYear = endDateOfOld.getFullYear();
+       const endMonth = String(endDateOfOld.getMonth() + 1).padStart(2, '0');
+       const endDay = String(endDateOfOld.getDate()).padStart(2, '0');
+       const formattedEndDate = `${endYear}-${endMonth}-${endDay}`;
+       
        setTransactions(prev => {
          const updated = prev.map(t => {
            if (t.id === splitOriginalId) {
-             return { ...t, endDate: endDateOfOld.toISOString().split('T')[0] };
+             return { ...t, endDate: formattedEndDate };
            }
            return t;
          });
@@ -247,11 +253,16 @@ const App: React.FC = () => {
        });
        
        setSplitOriginalId(null);
+       setEditingTransaction(null);
+       return;
     } 
-    // Comportamento normal de edição/criação
-    else if ('id' in data) {
+    
+    // 2. Comportamento normal de edição
+    if ('id' in data && data.id) {
       setTransactions(prev => prev.map(t => t.id === data.id ? (data as Transaction) : t));
-    } else {
+    } 
+    // 3. Comportamento normal de criação
+    else {
       const tx: Transaction = { ...data, id: Math.random().toString(36).substr(2, 9) };
       setTransactions(prev => [...prev, tx]);
     }
@@ -259,10 +270,7 @@ const App: React.FC = () => {
   };
 
   const handleRenamePaymentMethod = (oldName: string, newMethod: PaymentMethod) => {
-    // Atualiza a lista de métodos de pagamento
     setPaymentMethods(prev => prev.map(pm => pm.name === oldName ? newMethod : pm));
-
-    // Se o nome mudou, atualiza todas as transações que usavam esse nome
     if (oldName !== newMethod.name) {
       setTransactions(prev => prev.map(t => 
         t.cardSuffix === oldName ? { ...t, cardSuffix: newMethod.name } : t
@@ -280,20 +288,25 @@ const App: React.FC = () => {
   };
   
   const handleSplitSeries = (transaction: Transaction, selectedDate: Date) => {
-    // 1. Prepara a "nova" transação baseada na antiga
-    // Define a data para o dia 1 do mês selecionado na projeção
-    const newStartDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    // Prepara a "nova" transação para iniciar no dia 1 do mês selecionado
+    // Utiliza data local para evitar problemas de fuso
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = "01";
+    
+    const newStartDateStr = `${year}-${month}-${day}`;
     
     const newTxData = {
       ...transaction,
       id: undefined, // Remove ID para ser tratada como nova no form
-      date: newStartDate.toISOString().split('T')[0],
+      date: newStartDateStr,
       // Limpa overrides antigos pois é uma nova serie
       overrides: undefined, 
-      endDate: undefined
+      endDate: undefined,
+      reconciled: false // Reseta status de conciliação para a nova série futura
     };
     
-    // @ts-ignore - hack para passar o objeto sem ID para o modal que espera Transaction ou Omit
+    // @ts-ignore
     setEditingTransaction(newTxData as Transaction);
     setSplitOriginalId(transaction.id);
     setIsModalOpen(true);
