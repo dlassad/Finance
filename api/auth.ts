@@ -54,8 +54,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     else if (action === 'register') {
       const existing = await UserModel.findOne({ email });
+      
       if (existing) {
-        return res.status(400).json({ message: 'Este e-mail já possui cadastro' });
+        // CORREÇÃO PARA "USUÁRIO ZUMBI":
+        // Verifica se o usuário existe mas não tem dados (criado durante erro de crash anterior)
+        const hasData = await UserDataModel.findOne({ userId: existing._id.toString() });
+        
+        if (!hasData) {
+          console.log(`Detectado usuário corrompido (sem dados): ${email}. Removendo para recriação.`);
+          await UserModel.deleteOne({ _id: existing._id });
+          // O código continuará abaixo para recriar o usuário do zero
+        } else {
+          return res.status(400).json({ message: 'Este e-mail já possui cadastro. Tente fazer Login.' });
+        }
       }
 
       const newUser = await UserModel.create({
