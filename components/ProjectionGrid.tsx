@@ -481,6 +481,11 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
                   const groups = groupTransactions(monthlyItems);
                   
                   contentToRender = groups.map(group => {
+                      // SE O GRUPO TIVER APENAS 1 ITEM, RENDERIZA DIRETO (SEM COLAPSÁVEL)
+                      if (group.items.length === 1) {
+                          return renderTransactionItem(group.items[0], 0);
+                      }
+
                       const groupKey = `${idx}-${group.id}`;
                       const isExpanded = expandedGroups.has(groupKey);
                       
@@ -567,4 +572,3 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
     </div>
   );
 };
-    
