@@ -13,10 +13,15 @@ import {
   Square, 
   PencilLine, 
   ChevronDown,
+  ChevronUp,
   ListFilter,
   History,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  Layers,
+  LayoutList,
+  CreditCard,
+  Tag
 } from 'lucide-react';
 
 interface ProjectionGridProps {
@@ -29,6 +34,23 @@ interface ProjectionGridProps {
   categories: string[];
   cards: string[];
   onEditClick: (transaction: Transaction, monthKey: string, date: Date) => void;
+}
+
+// Interface auxiliar para os itens processados com valor de exibição
+interface ProcessedTransaction extends Transaction {
+  displayAmount: number;
+  installmentInfo: string;
+  hasOverride: boolean;
+  monthKey: string;
+  targetDate: Date;
+}
+
+interface GroupedData {
+  id: string;
+  label: string;
+  type: 'CARD' | 'CATEGORY';
+  items: ProcessedTransaction[];
+  total: number;
 }
 
 export const ProjectionGrid: React.FC<ProjectionGridProps> = ({ 
@@ -48,6 +70,12 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
   const [hiddenMonths, setHiddenMonths] = useState<Set<number>>(new Set());
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [monthFilterSearch, setMonthFilterSearch] = useState('');
+  
+  // Novo estado para controlar o modo de visualização: 'list' ou 'grouped'
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
+  
+  // Estado para controlar quais grupos estão expandidos (chave: "mesIdx-groupId")
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -69,6 +97,16 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
       newHidden.add(idx);
     }
     setHiddenMonths(newHidden);
+  };
+
+  const toggleGroupExpansion = (groupId: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupId)) {
+      newExpanded.delete(groupId);
+    } else {
+      newExpanded.add(groupId);
+    }
+    setExpandedGroups(newExpanded);
   };
 
   const showAllMonths = () => {
@@ -159,8 +197,85 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
     return { items: filtered, targetDate };
   };
 
+  // Função para agrupar itens
+  const groupTransactions = (items: ProcessedTransaction[]): GroupedData[] => {
+    const groups: Record<string, GroupedData> = {};
+
+    items.forEach(item => {
+      let key = '';
+      let label = '';
+      let type: 'CARD' | 'CATEGORY' = 'CATEGORY';
+
+      if (item.cardSuffix) {
+        key = `CARD_${item.cardSuffix}`;
+        label = `Cartão ${item.cardSuffix}`;
+        type = 'CARD';
+      } else {
+        key = `CAT_${item.category}`;
+        label = item.category;
+        type = 'CATEGORY';
+      }
+
+      if (!groups[key]) {
+        groups[key] = {
+          id: key,
+          label,
+          type,
+          items: [],
+          total: 0
+        };
+      }
+
+      groups[key].items.push(item);
+      groups[key].total += item.displayAmount;
+    });
+
+    // Ordena: Cartões primeiro (pelo maior total), depois Categorias (pelo maior total)
+    return Object.values(groups).sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'CARD' ? -1 : 1;
+      return Math.abs(b.total) - Math.abs(a.total); // Ordena por valor absoluto (mais caro primeiro)
+    });
+  };
+
   const formattedStartMonth = `${projectionStartDate.getFullYear()}-${String(projectionStartDate.getMonth() + 1).padStart(2, '0')}`;
   const isRollingToday = formattedStartMonth === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+  const renderTransactionItem = (t: ProcessedTransaction, tIdx: number) => {
+    const dark = isDarkBg(t.color);
+    return (
+       <div 
+         key={t.id + tIdx} 
+         onClick={(e) => { e.stopPropagation(); onEditClick(t, t.monthKey, t.targetDate); }}
+         className={`mx-2 my-2 p-3 rounded-2xl border transition-all group/item relative cursor-pointer ${
+           t.hasOverride ? 'bg-amber-50 border-amber-200 shadow-sm' : 'border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md'
+         } ${t.color || ''} ${t.fontColor || (dark ? 'text-white' : 'text-gray-900')}`}
+       >
+          <div className="flex justify-between items-start gap-2 mb-1">
+            <span className="text-[10px] font-black uppercase leading-tight flex-1">
+              {t.description}
+              {t.installmentInfo && <span className={`${dark ? 'text-white/80' : 'text-blue-500'} ml-1 font-bold`}>{t.installmentInfo}</span>}
+              {t.hasOverride && (
+                <span className={`inline-flex items-center ml-1 ${dark ? 'text-white/60' : 'text-amber-600'}`} title="Ajuste individual">
+                  <PencilLine size={10} />
+                </span>
+              )}
+            </span>
+            <span className={`text-[11px] font-black ${t.type === EntryType.INCOME ? (dark ? 'text-white' : 'text-green-600') : (dark ? 'text-white' : 'text-red-600')}`}>
+              {formatCurrency(t.displayAmount)}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[8px] opacity-70 font-bold uppercase tracking-widest">{t.category}</span>
+            <div className="flex items-center gap-1.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+              <Edit3 size={10} className={dark ? 'text-white' : 'text-blue-500'} />
+              {t.cardSuffix && (
+                <span className={`text-[8px] font-black ${dark ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'} px-1.5 py-0.5 rounded-lg uppercase border ${dark ? 'border-white/20' : 'border-gray-200'}`}>{t.cardSuffix}</span>
+              )}
+            </div>
+          </div>
+       </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -245,6 +360,24 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
           </div>
 
           <div className="flex gap-2 relative" ref={dropdownRef}>
+            {/* Toggle View Mode Button */}
+            <div className="bg-gray-50 p-1 rounded-2xl border border-gray-100 flex items-center">
+               <button 
+                 onClick={() => setViewMode('list')}
+                 className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                 title="Lista Detalhada"
+               >
+                 <LayoutList size={18} />
+               </button>
+               <button 
+                 onClick={() => setViewMode('grouped')}
+                 className={`p-2 rounded-xl transition-all ${viewMode === 'grouped' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                 title="Agrupado por Cartão/Categoria"
+               >
+                 <Layers size={18} />
+               </button>
+            </div>
+
             <button 
               onClick={() => setIsMonthSelectorOpen(!isMonthSelectorOpen)}
               className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-black transition-all border ${
@@ -254,7 +387,7 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
               }`}
             >
               <ListFilter size={18} />
-              <span>MESES VISÍVEIS ({visibleCount})</span>
+              <span>MESES ({visibleCount})</span>
               <ChevronDown size={16} className={`transition-transform ${isMonthSelectorOpen ? 'rotate-180' : ''}`} />
             </button>
 
@@ -334,10 +467,62 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
             {summaries.map((summary, idx) => {
               if (hiddenMonths.has(idx)) return null;
               
-              const { items: monthlyItems, targetDate } = getFilteredTransactionsForMonth(idx);
+              const { items: monthlyItems } = getFilteredTransactionsForMonth(idx);
               const monthlyResult = summary.income + summary.expense;
               const accumulatedBalance = summary.balance;
               
+              // Se estiver no modo Agrupado, processa os itens
+              let contentToRender;
+              
+              if (viewMode === 'list') {
+                  contentToRender = monthlyItems.map((t, tIdx) => renderTransactionItem(t, tIdx));
+              } else {
+                  // Modo Agrupado
+                  const groups = groupTransactions(monthlyItems);
+                  
+                  contentToRender = groups.map(group => {
+                      const groupKey = `${idx}-${group.id}`;
+                      const isExpanded = expandedGroups.has(groupKey);
+                      
+                      return (
+                        <div key={group.id} className="mx-2 my-2 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50/30">
+                           <div 
+                             onClick={() => toggleGroupExpansion(groupKey)}
+                             className={`p-3 flex items-center justify-between cursor-pointer hover:bg-white transition-colors ${isExpanded ? 'bg-white shadow-sm' : ''}`}
+                           >
+                             <div className="flex items-center gap-2 overflow-hidden">
+                                {group.type === 'CARD' ? (
+                                    <div className="bg-gray-900 text-white p-1 rounded-md min-w-[20px] h-[20px] flex items-center justify-center">
+                                        <CreditCard size={10} />
+                                    </div>
+                                ) : (
+                                    <div className="bg-blue-100 text-blue-600 p-1 rounded-md min-w-[20px] h-[20px] flex items-center justify-center">
+                                        <Tag size={10} />
+                                    </div>
+                                )}
+                                <div className="flex flex-col truncate">
+                                    <span className="text-[10px] font-black uppercase text-gray-700 truncate">{group.label}</span>
+                                    <span className="text-[9px] text-gray-400 font-bold">{group.items.length} itens</span>
+                                </div>
+                             </div>
+                             <div className="flex items-center gap-1">
+                                <span className={`text-[11px] font-black ${group.total < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                    {formatCurrency(group.total)}
+                                </span>
+                                {isExpanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400" />}
+                             </div>
+                           </div>
+                           
+                           {isExpanded && (
+                               <div className="border-t border-gray-100 bg-white pl-2">
+                                   {group.items.map((t, tIdx) => renderTransactionItem(t, tIdx))}
+                               </div>
+                           )}
+                        </div>
+                      );
+                  });
+              }
+
               return (
                 <div key={idx} className="w-[260px] border-r border-gray-50 last:border-r-0 flex flex-col group animate-in fade-in slide-in-from-right-2 duration-300">
                   <div className="bg-gray-900/95 text-white p-5 flex justify-between items-center">
@@ -358,42 +543,7 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
                   
                   <div className="flex-1 h-[450px] overflow-y-auto bg-white/50 custom-scrollbar p-1">
                      {monthlyItems.length > 0 ? (
-                       monthlyItems.map((t, tIdx) => {
-                         const dark = isDarkBg(t.color);
-                         return (
-                           <div 
-                             key={tIdx} 
-                             onClick={() => onEditClick(t, t.monthKey, targetDate)}
-                             className={`mx-2 my-2 p-3 rounded-2xl border transition-all group/item relative cursor-pointer ${
-                               t.hasOverride ? 'bg-amber-50 border-amber-200 shadow-sm' : 'border-transparent hover:border-blue-200 hover:bg-white hover:shadow-md'
-                             } ${t.color || ''} ${t.fontColor || (dark ? 'text-white' : 'text-gray-900')}`}
-                           >
-                              <div className="flex justify-between items-start gap-2 mb-1">
-                                <span className="text-[10px] font-black uppercase leading-tight flex-1">
-                                  {t.description}
-                                  {t.installmentInfo && <span className={`${dark ? 'text-white/80' : 'text-blue-500'} ml-1 font-bold`}>{t.installmentInfo}</span>}
-                                  {t.hasOverride && (
-                                    <span className={`inline-flex items-center ml-1 ${dark ? 'text-white/60' : 'text-amber-600'}`} title="Ajuste individual">
-                                      <PencilLine size={10} />
-                                    </span>
-                                  )}
-                                </span>
-                                <span className={`text-[11px] font-black ${t.type === EntryType.INCOME ? (dark ? 'text-white' : 'text-green-600') : (dark ? 'text-white' : 'text-red-600')}`}>
-                                  {formatCurrency(t.displayAmount)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-[8px] opacity-70 font-bold uppercase tracking-widest">{t.category}</span>
-                                <div className="flex items-center gap-1.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                  <Edit3 size={10} className={dark ? 'text-white' : 'text-blue-500'} />
-                                  {t.cardSuffix && (
-                                    <span className={`text-[8px] font-black ${dark ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'} px-1.5 py-0.5 rounded-lg uppercase border ${dark ? 'border-white/20' : 'border-gray-200'}`}>{t.cardSuffix}</span>
-                                  )}
-                                </div>
-                              </div>
-                           </div>
-                         );
-                       })
+                        contentToRender
                      ) : (
                        <div className="flex flex-col items-center justify-center h-full p-8 text-center opacity-20">
                           <Filter size={24} className="mb-2" />
@@ -417,3 +567,4 @@ export const ProjectionGrid: React.FC<ProjectionGridProps> = ({
     </div>
   );
 };
+    
