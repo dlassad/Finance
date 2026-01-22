@@ -4,15 +4,35 @@ import { UserModel, UserDataModel } from '../lib/models';
 import { INITIAL_TRANSACTIONS, CARD_SUFFIXES, CATEGORY_STRUCTURE } from '../constants';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Garante que o corpo da requisição seja interpretado corretamente
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+  // Configura CORS para evitar problemas de requisição
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
   }
 
   try {
-    console.log("Iniciando conexão com o banco...");
+    console.log("API Auth: Iniciando processamento...");
+    
+    if (req.method !== 'POST') {
+      return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    if (!process.env.MONGODB_URI) {
+      console.error("ERRO: MONGODB_URI não definida no ambiente.");
+      return res.status(500).json({ message: 'Erro de configuração do servidor (DB)' });
+    }
+
+    console.log("API Auth: Conectando ao Banco de Dados...");
     await connectToDatabase();
-    console.log("Conectado. Processando requisição:", req.body.action);
+    console.log("API Auth: Conectado com sucesso.");
 
     const { action, email, password, name } = req.body;
 
@@ -40,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         password
       });
 
-      // Inicializa os dados padrão para o novo usuário
+      // Cria dados iniciais
       try {
         await UserDataModel.create({
           userId: newUser._id.toString(),
@@ -54,7 +74,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       } catch (dataError) {
         console.error("Erro ao criar dados iniciais:", dataError);
-        // Não falha o registro se os dados iniciais falharem, apenas loga
       }
 
       return res.status(201).json({ 
@@ -67,11 +86,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ message: 'Ação inválida' });
 
   } catch (error: any) {
-    console.error("Erro na API Auth:", error);
-    // Retorna JSON mesmo em caso de erro crítico
+    console.error("Erro CRÍTICO na API:", error);
     return res.status(500).json({ 
       message: 'Erro interno do servidor', 
-      error: error.message || 'Erro desconhecido' 
+      error: error.message || 'Falha desconhecida' 
     });
   }
 }

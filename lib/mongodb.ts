@@ -1,23 +1,19 @@
 import mongoose from 'mongoose';
 
-// Interface para o cache global do Mongoose
-interface MongooseCache {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-}
+// Tipagem segura para o cache global usando globalThis
+const globalAny: any = globalThis;
 
-// Inicializa o cache global
-let cached: MongooseCache = (global as any).mongoose;
+let cached = globalAny.mongoose;
 
 if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
+  cached = globalAny.mongoose = { conn: null, promise: null };
 }
 
 async function connectToDatabase() {
   const MONGODB_URI = process.env.MONGODB_URI;
 
   if (!MONGODB_URI) {
-    throw new Error('A variável de ambiente MONGODB_URI não está definida. Verifique o painel do Vercel.');
+    throw new Error('A variável de ambiente MONGODB_URI não está definida.');
   }
 
   if (cached.conn) {
@@ -27,8 +23,8 @@ async function connectToDatabase() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 5000, // Timeout de 5s para falhar antes do limite do Vercel (10s)
-      socketTimeoutMS: 45000,
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10, // Importante para serverless
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
