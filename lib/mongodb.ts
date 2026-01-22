@@ -25,6 +25,7 @@ async function connectToDatabase() {
       bufferCommands: false,
       serverSelectionTimeoutMS: 5000,
       maxPoolSize: 10, // Importante para serverless
+      dbName: 'Finance', // Define explicitamente o nome do banco de dados
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
