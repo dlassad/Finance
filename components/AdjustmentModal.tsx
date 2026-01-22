@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { Transaction, EntryType } from '../types';
-import { formatCurrency } from '../utils';
 import { X, Calendar, Edit3, Save, RotateCcw, Split, Palette, Type as FontIcon, Check } from 'lucide-react';
 import { BG_COLORS, TEXT_COLORS } from '../constants';
 

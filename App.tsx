@@ -6,7 +6,7 @@ import {
   Wallet, 
   Plus, 
   LayoutGrid, 
-  CreditCard as CreditCardIcon,
+  CreditCard as CreditCardIcon, 
   CalendarDays,
   Menu,
   Activity,
