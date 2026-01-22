@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
+import { CreditCard, Tag, Plus, Trash2, ChevronDown, ChevronRight, RotateCcw, ArrowUp, ArrowDown, Calendar, Edit3, Save, X } from 'lucide-react';
 import { CategoryStructure, PaymentMethod } from '../types';
 import { CARD_SUFFIXES as DEFAULT_CARDS, CATEGORY_STRUCTURE as DEFAULT_CATEGORIES } from '../constants';
 
@@ -20,6 +20,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [newMethodIsCard, setNewMethodIsCard] = useState(false);
   const [newMethodDueDay, setNewMethodDueDay] = useState('');
   const [newMethodBestDay, setNewMethodBestDay] = useState('');
+  
+  // Estado para controlar a edição
+  const [editingOriginalName, setEditingOriginalName] = useState<string | null>(null);
 
   const [newCategory, setNewCategory] = useState('');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -27,28 +30,69 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   // --- Lógica de Formas de Pagamento ---
 
-  const handleAddMethod = () => {
-    if (newMethodName && !paymentMethods.find(m => m.name.toUpperCase() === newMethodName.toUpperCase())) {
-      const newMethod: PaymentMethod = { 
-        name: newMethodName.toUpperCase(), 
-        isCreditCard: newMethodIsCard 
-      };
+  const handleSaveMethod = () => {
+    if (!newMethodName) return;
 
-      if (newMethodIsCard) {
-        if (newMethodDueDay) newMethod.dueDay = parseInt(newMethodDueDay);
-        if (newMethodBestDay) newMethod.bestDay = parseInt(newMethodBestDay);
-      }
+    // Verifica duplicidade (ignorando o próprio item se estiver editando)
+    const nameExists = paymentMethods.some(
+      m => m.name.toUpperCase() === newMethodName.toUpperCase() && m.name !== editingOriginalName
+    );
 
-      setPaymentMethods([...paymentMethods, newMethod]);
-      setNewMethodName('');
-      setNewMethodIsCard(false);
-      setNewMethodDueDay('');
-      setNewMethodBestDay('');
+    if (nameExists) {
+      alert('Já existe uma forma de pagamento com este nome.');
+      return;
     }
+
+    const methodData: PaymentMethod = { 
+      name: newMethodName.toUpperCase(), 
+      isCreditCard: newMethodIsCard 
+    };
+
+    if (newMethodIsCard) {
+      if (newMethodDueDay) methodData.dueDay = parseInt(newMethodDueDay);
+      if (newMethodBestDay) methodData.bestDay = parseInt(newMethodBestDay);
+    }
+
+    if (editingOriginalName) {
+      // Atualizar existente
+      setPaymentMethods(paymentMethods.map(m => m.name === editingOriginalName ? methodData : m));
+      setEditingOriginalName(null);
+    } else {
+      // Criar novo
+      setPaymentMethods([...paymentMethods, methodData]);
+    }
+
+    // Resetar formulário
+    setNewMethodName('');
+    setNewMethodIsCard(false);
+    setNewMethodDueDay('');
+    setNewMethodBestDay('');
+  };
+
+  const handleEditMethod = (method: PaymentMethod) => {
+    setNewMethodName(method.name);
+    setNewMethodIsCard(method.isCreditCard);
+    setNewMethodDueDay(method.dueDay ? method.dueDay.toString() : '');
+    setNewMethodBestDay(method.bestDay ? method.bestDay.toString() : '');
+    setEditingOriginalName(method.name);
+    
+    // Rola a página para o topo do formulário suavemente
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setNewMethodName('');
+    setNewMethodIsCard(false);
+    setNewMethodDueDay('');
+    setNewMethodBestDay('');
+    setEditingOriginalName(null);
   };
 
   const handleRemoveMethod = (name: string) => {
-    setPaymentMethods(paymentMethods.filter(m => m.name !== name));
+    if (confirm('Tem certeza que deseja excluir?')) {
+        setPaymentMethods(paymentMethods.filter(m => m.name !== name));
+        if (editingOriginalName === name) handleCancelEdit();
+    }
   };
 
   const handleToggleCardType = (name: string) => {
@@ -164,7 +208,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <h3 className="font-black text-lg text-gray-800 uppercase tracking-tighter">Formas de Pagamento</h3>
           </div>
           
-          <div className="space-y-4 bg-gray-50 p-5 rounded-[1.5rem] border border-gray-100">
+          <div className={`space-y-4 p-5 rounded-[1.5rem] border transition-all ${editingOriginalName ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'}`}>
+            {editingOriginalName && (
+               <div className="flex items-center gap-2 mb-2 text-blue-600 text-xs font-black uppercase tracking-widest">
+                  <Edit3 size={12} /> Editando: {editingOriginalName}
+               </div>
+            )}
             <div className="flex gap-2">
               <input 
                 type="text" 
@@ -172,14 +221,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 className="flex-1 px-4 py-2.5 bg-white border-2 border-transparent rounded-xl text-sm font-bold focus:border-blue-500 outline-none"
                 value={newMethodName}
                 onChange={(e) => setNewMethodName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddMethod()}
+                onKeyPress={(e) => e.key === 'Enter' && handleSaveMethod()}
               />
               <button 
-                onClick={handleAddMethod}
-                className="bg-blue-600 text-white p-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                onClick={handleSaveMethod}
+                className={`${editingOriginalName ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white p-2.5 rounded-xl transition-all shadow-lg shadow-blue-100`}
+                title={editingOriginalName ? "Salvar Alterações" : "Adicionar Novo"}
               >
-                <Plus size={20} />
+                {editingOriginalName ? <Save size={20} /> : <Plus size={20} />}
               </button>
+              {editingOriginalName && (
+                <button 
+                  onClick={handleCancelEdit}
+                  className="bg-gray-200 text-gray-600 p-2.5 rounded-xl hover:bg-gray-300 transition-all"
+                  title="Cancelar Edição"
+                >
+                  <X size={20} />
+                </button>
+              )}
             </div>
             
             <div className="flex items-center gap-3 cursor-pointer group">
@@ -223,7 +282,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
           <div className="space-y-2">
             {paymentMethods.map((method, idx) => (
-              <div key={method.name} className="flex items-center justify-between bg-white border border-gray-100 p-3 rounded-2xl hover:border-blue-200 transition-all group shadow-sm">
+              <div 
+                key={method.name} 
+                className={`flex items-center justify-between bg-white border p-3 rounded-2xl transition-all group shadow-sm ${editingOriginalName === method.name ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-100 hover:border-blue-200'}`}
+              >
                 <div className="flex items-center gap-4">
                     <button 
                         onClick={() => handleToggleCardType(method.name)}
@@ -255,9 +317,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         </button>
                     )}
                   </div>
+                  
+                  <button 
+                    onClick={() => handleEditMethod(method)}
+                    className={`p-2 rounded-lg transition-all ${editingOriginalName === method.name ? 'text-blue-600 bg-blue-50' : 'text-gray-300 hover:text-blue-600 hover:bg-blue-50'}`}
+                    title="Editar"
+                  >
+                    <Edit3 size={16} />
+                  </button>
+
                   <button 
                     onClick={() => handleRemoveMethod(method.name)}
                     className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="Excluir"
                   >
                     <Trash2 size={16} />
                   </button>
