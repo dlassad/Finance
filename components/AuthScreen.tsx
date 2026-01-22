@@ -47,7 +47,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         })
       });
 
-      const data = await response.json();
+      // Primeiro pegamos o texto puro para evitar erro de JSON inválido
+      const responseText = await response.text();
+      let data;
+
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error("Erro ao processar resposta do servidor:", responseText);
+        // Se não for JSON, provavelmente é um erro 500 do Vercel
+        throw new Error('O servidor encontrou um erro interno. Tente novamente mais tarde.');
+      }
 
       if (!response.ok) {
         throw new Error(data.message || 'Erro na autenticação');
