@@ -192,7 +192,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                   <CreditCard size={12} /> Pagamento
                 </label>
                 <select className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-xl focus:bg-white focus:border-blue-500 outline-none transition-all font-bold cursor-pointer" value={cardSuffix} onChange={(e) => setCardSuffix(e.target.value)}>
-                  <option value="">Não Especificado</option>
+                  
                   {paymentOptions.map(m => <option key={m.name} value={m.name}>{m.name} {m.isCreditCard ? '(Cartão)' : '(Imediato)'}</option>)}
                 </select>
               </div>
